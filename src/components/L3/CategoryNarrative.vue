@@ -70,8 +70,8 @@ const narrative = computed(() => {
 </script>
 
 <template>
-  <div class="max-w-[680px]">
-    <p class="text-[15px] leading-[1.75] text-vs-text/90">
+  <div>
+    <p class="text-[14px] leading-[1.7] text-vs-text/90">
       {{ narrative }}
     </p>
   </div>

@@ -36,8 +36,8 @@ const baselineAvg = computed(() => {
   return bl.reduce((sum, y) => sum + y.composite, 0) / bl.length
 })
 
-// Ribbon height = 1/8 of total inner height
-const ribbonHeight = computed(() => Math.max(12, dimensions.value.innerHeight / 8))
+// Ribbon height = thin colored line (not a bar chart)
+const ribbonHeight = computed(() => 6)
 const chartHeight = computed(() => dimensions.value.innerHeight - ribbonHeight.value - 6) // 6px gap
 
 // Scales

@@ -18,8 +18,8 @@ const isOI = computed(() => props.data.config.id === 'oi')
 const containerRef = ref<HTMLElement | null>(null)
 const { dimensions } = useChartDimensions(
   containerRef,
-  { top: 36, right: 72, bottom: 44, left: 48 },
-  0.4,
+  { top: 28, right: 72, bottom: 36, left: 48 },
+  0.28,
 )
 const svgRef = ref<SVGSVGElement | null>(null)
 

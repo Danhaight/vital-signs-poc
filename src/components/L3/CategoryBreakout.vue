@@ -52,7 +52,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 <template>
   <div class="max-w-6xl mx-auto">
     <!-- Category header -->
-    <div class="mb-8">
+    <div class="mb-5">
       <div class="flex items-center gap-3 mb-2">
         <span
           class="w-3 h-3 rounded-full"
@@ -90,33 +90,36 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
       </div>
     </div>
 
-    <!-- Sub-component chart -->
-    <div class="bg-vs-surface border border-vs-border rounded-lg p-6 mb-8">
-      <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider font-mono mb-4">
-        Sub-Component Decomposition
-      </h3>
-      <SubComponentChart
-        :data="data"
-        :category-key="categoryKey"
-      />
-    </div>
+    <!-- Chart + Narrative side-by-side -->
+    <div class="bg-vs-surface border border-vs-border rounded-lg p-6 mb-6">
+      <div class="flex gap-6">
+        <!-- Chart: takes ~62% -->
+        <div class="flex-[3] min-w-0">
+          <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider font-mono mb-3">
+            Sub-Component Decomposition
+          </h3>
+          <SubComponentChart
+            :data="data"
+            :category-key="categoryKey"
+          />
+        </div>
 
-    <!-- Category narrative -->
-    <div class="mb-8">
-      <CategoryNarrative
-        :data="data"
-        :category-key="categoryKey"
-      />
+        <!-- Narrative: takes ~38% -->
+        <div class="flex-[2] min-w-0 flex flex-col justify-between border-l border-vs-border pl-6">
+          <CategoryNarrative
+            :data="data"
+            :category-key="categoryKey"
+          />
+          <p class="text-vs-dim text-xs font-mono mt-4">
+            Sources: {{ cat.sources.join(', ') }} · {{ data.config.yearRange[0] }}–{{ data.config.yearRange[1] }}
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Policy citations (only for policy category) -->
-    <div v-if="categoryKey === 'policy'" class="mb-8">
+    <div v-if="categoryKey === 'policy'" class="mb-6">
       <PolicyCitations />
     </div>
-
-    <!-- Data sources -->
-    <p class="text-vs-dim text-xs font-mono mt-8">
-      Sources: {{ cat.sources.join(', ') }} · {{ data.config.yearRange[0] }}–{{ data.config.yearRange[1] }}
-    </p>
   </div>
 </template>
