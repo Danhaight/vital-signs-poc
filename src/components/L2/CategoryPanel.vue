@@ -19,9 +19,10 @@ const emit = defineEmits<{
 const cat = computed<CategoryMeta>(() => CATEGORY_MAP[props.categoryKey])
 
 const containerRef = ref<HTMLElement | null>(null)
+// Reduced left margin — no y-axis labels. Small right pad for endpoint dot.
 const { dimensions } = useChartDimensions(
   containerRef,
-  { top: 8, right: 8, bottom: 24, left: 32 },
+  { top: 4, right: 10, bottom: 4, left: 4 },
   0.7,
 )
 
@@ -63,8 +64,6 @@ const linePath = computed(() => {
   return gen(props.years) ?? ''
 })
 
-// Area path removed — L2 small multiples use line-only encoding for flow data
-
 // Launch marker
 const launchX = computed(() => {
   if (!xScale.value) return 0
@@ -92,42 +91,27 @@ const trendColor = computed(() => {
   return '#8a8d97'
 })
 
-// Minimal y-axis ticks
-const yTicks = [0, 50, 100]
-
-// Render axes
-function renderAxes() {
-  if (!svgRef.value || !xScale.value || !yScale.value) return
+// Subtle horizontal gridlines — no axis labels, just faint reference marks
+function renderGridlines() {
+  if (!svgRef.value || !yScale.value) return
   const svg = d3.select(svgRef.value)
   const chartArea = svg.select('.chart-area')
 
-  // Y-axis (minimal)
-  chartArea.select('.y-axis').remove()
-  chartArea
-    .append('g')
-    .attr('class', 'y-axis')
-    .call(
-      d3
-        .axisLeft(yScale.value)
-        .tickValues(yTicks)
-        .tickSize(-dimensions.value.innerWidth)
-        .tickPadding(4),
-    )
-    .call(g => g.select('.domain').remove())
-    .call(g =>
-      g
-        .selectAll('.tick line')
-        .attr('stroke', '#262a38')
-        .attr('stroke-dasharray', '2,3'),
-    )
-    .selectAll('text')
-    .style('fill', '#4d5162')
-    .style('font-family', "'DM Mono', monospace")
-    .style('font-size', '9px')
+  chartArea.select('.gridlines').remove()
+  const g = chartArea.append('g').attr('class', 'gridlines')
+
+  // Just a midpoint reference line at 50
+  g.append('line')
+    .attr('x1', 0)
+    .attr('x2', dimensions.value.innerWidth)
+    .attr('y1', yScale.value(50))
+    .attr('y2', yScale.value(50))
+    .attr('stroke', '#262a38')
+    .attr('stroke-dasharray', '2,3')
 }
 
-onMounted(renderAxes)
-watch(() => [dimensions.value, props.years], renderAxes, { deep: true })
+onMounted(renderGridlines)
+watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
 </script>
 
 <template>
@@ -137,14 +121,14 @@ watch(() => [dimensions.value, props.years], renderAxes, { deep: true })
            hover:border-vs-muted/40 transition-all cursor-pointer text-left
            group relative"
   >
-    <!-- Header: name + trend + value -->
+    <!-- Header: color dot + mixed-case name + score + trend -->
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
         <span
           class="w-1.5 h-1.5 rounded-full"
           :style="{ backgroundColor: cat.color }"
         ></span>
-        <span class="text-[10px] font-mono uppercase tracking-wider text-vs-muted group-hover:text-vs-text transition-colors">
+        <span class="text-[10px] font-mono text-vs-muted group-hover:text-vs-text transition-colors">
           {{ cat.label }}
         </span>
       </div>
@@ -164,7 +148,7 @@ watch(() => [dimensions.value, props.years], renderAxes, { deep: true })
       </div>
     </div>
 
-    <!-- Chart -->
+    <!-- Chart (no y-axis labels — "remove to improve") -->
     <div ref="containerRef" class="w-full">
       <svg
         v-if="dimensions.width > 0"
@@ -200,7 +184,7 @@ watch(() => [dimensions.value, props.years], renderAxes, { deep: true })
             opacity="0.3"
           />
 
-          <!-- Line (flow — no area fill at L2) -->
+          <!-- Line -->
           <path
             :d="linePath"
             fill="none"
@@ -222,11 +206,6 @@ watch(() => [dimensions.value, props.years], renderAxes, { deep: true })
           />
         </g>
       </svg>
-    </div>
-
-    <!-- Weight label -->
-    <div class="text-[9px] font-mono text-vs-dim mt-0.5 text-center">
-      {{ (cat.weight * 100).toFixed(0) }}% weight
     </div>
   </button>
 </template>

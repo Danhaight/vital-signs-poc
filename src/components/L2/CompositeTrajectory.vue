@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import * as d3 from 'd3'
-import type { ClientData, CategoryKey } from '../../data/types'
-import { CATEGORY_MAP } from '../../data/types'
+import type { ClientData } from '../../data/types'
 import { useChartDimensions } from '../../composables/useChartDimensions'
 
 const props = defineProps<{
@@ -13,11 +12,11 @@ const props = defineProps<{
 const COMPOSITE_COLOR = '#C8C3B8'
 
 const containerRef = ref<HTMLElement | null>(null)
-// Slightly taller ratio to accommodate the ribbon beneath
+// Tighter aspect ratio — shorter, less dead space
 const { dimensions } = useChartDimensions(
   containerRef,
-  { top: 36, right: 56, bottom: 44, left: 48 },
-  0.42,
+  { top: 24, right: 56, bottom: 32, left: 48 },
+  0.32,
 )
 
 const svgRef = ref<SVGSVGElement | null>(null)
@@ -36,9 +35,11 @@ const baselineAvg = computed(() => {
   return bl.reduce((sum, y) => sum + y.composite, 0) / bl.length
 })
 
-// Ribbon height = thin colored line (not a bar chart)
-const ribbonHeight = computed(() => 6)
-const chartHeight = computed(() => dimensions.value.innerHeight - ribbonHeight.value - 6) // 6px gap
+// Delta from baseline
+const deltaFromBaseline = computed(() => {
+  if (!latestYear.value) return 0
+  return latestYear.value.composite - baselineAvg.value
+})
 
 // Scales
 const xScale = computed(() => {
@@ -51,8 +52,9 @@ const xScale = computed(() => {
 })
 
 const yScale = computed(() => {
-  if (!chartHeight.value) return null
-  return d3.scaleLinear().domain([0, 100]).range([chartHeight.value, 0])
+  const d = dimensions.value
+  if (!d.innerHeight) return null
+  return d3.scaleLinear().domain([0, 100]).range([d.innerHeight, 0])
 })
 
 // Path generators
@@ -71,7 +73,7 @@ const areaPath = computed(() => {
   const gen = d3
     .area<typeof years.value[0]>()
     .x(d => xScale.value!(d.year))
-    .y0(chartHeight.value)
+    .y0(dimensions.value.innerHeight)
     .y1(d => yScale.value!(d.composite))
     .curve(d3.curveMonotoneX)
   return gen(years.value) ?? ''
@@ -85,7 +87,7 @@ const baselineBand = computed(() => {
   return {
     x: x1,
     width: x2 - x1,
-    height: chartHeight.value,
+    height: dimensions.value.innerHeight,
   }
 })
 
@@ -102,75 +104,6 @@ const endpointPos = computed(() => {
     x: xScale.value(latestYear.value.year),
     y: yScale.value(latestYear.value.composite),
   }
-})
-
-// ─── Primary Driver Ribbon ───
-// Use a 3-year rolling mode to smooth single-year flickers
-const smoothedDrivers = computed(() => {
-  const yrs = years.value
-  if (yrs.length === 0) return []
-
-  return yrs.map((yr, i) => {
-    // Gather a window of up to 3 years centered on i
-    const windowStart = Math.max(0, i - 1)
-    const windowEnd = Math.min(yrs.length - 1, i + 1)
-    const window = yrs.slice(windowStart, windowEnd + 1)
-
-    // Count how often each category is primary driver in the window
-    const counts: Partial<Record<CategoryKey, number>> = {}
-    for (const w of window) {
-      counts[w.primaryDriver] = (counts[w.primaryDriver] ?? 0) + 1
-    }
-
-    // Pick the most frequent; on tie, prefer the center year's driver
-    let best: CategoryKey = yr.primaryDriver
-    let bestCount = 0
-    for (const [key, count] of Object.entries(counts) as [CategoryKey, number][]) {
-      if (count > bestCount || (count === bestCount && key === yr.primaryDriver)) {
-        best = key
-        bestCount = count
-      }
-    }
-
-    return { year: yr.year, driver: best }
-  })
-})
-
-// Build ribbon segments (contiguous runs of the same driver)
-const ribbonSegments = computed(() => {
-  if (!xScale.value) return []
-  const drivers = smoothedDrivers.value
-  if (drivers.length === 0) return []
-
-  const segments: { x: number; width: number; color: string; label: string }[] = []
-  let segStart = 0
-
-  for (let i = 1; i <= drivers.length; i++) {
-    if (i === drivers.length || drivers[i]!.driver !== drivers[segStart]!.driver) {
-      const startYear = drivers[segStart]!.year
-      const endYear = drivers[i - 1]!.year
-      const cat = CATEGORY_MAP[drivers[segStart]!.driver]
-
-      // Extend segments to fill the space between data points
-      const x1 = segStart === 0
-        ? xScale.value!(startYear)
-        : xScale.value!((startYear + drivers[segStart - 1]!.year) / 2)
-      const x2 = i === drivers.length
-        ? xScale.value!(endYear)
-        : xScale.value!((endYear + drivers[i]!.year) / 2)
-
-      segments.push({
-        x: x1,
-        width: x2 - x1,
-        color: cat.color,
-        label: cat.label,
-      })
-
-      segStart = i
-    }
-  }
-
-  return segments
 })
 
 // Y-axis ticks
@@ -194,13 +127,13 @@ function renderAxes() {
   if (!svgRef.value || !xScale.value || !yScale.value) return
   const svg = d3.select(svgRef.value)
 
-  // X-axis (at bottom of chart area, above ribbon)
+  // X-axis
   svg.select('.x-axis').remove()
   const xAxisG = svg
     .select('.chart-area')
     .append('g')
     .attr('class', 'x-axis')
-    .attr('transform', `translate(0, ${chartHeight.value})`)
+    .attr('transform', `translate(0, ${dimensions.value.innerHeight})`)
 
   xAxisG
     .call(
@@ -260,9 +193,22 @@ watch(
 
 <template>
   <div class="w-full">
-    <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider mb-4 font-mono">
-      Composite Vital Signs Index
-    </h3>
+    <!-- Header with title + score callout -->
+    <div class="flex items-start justify-between mb-4">
+      <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider font-mono">
+        Composite Vital Signs Index
+      </h3>
+
+      <!-- Prominent score callout — the 10-second answer -->
+      <div v-if="latestYear" class="text-right">
+        <div class="text-[32px] font-mono font-bold leading-none" style="color: #C8C3B8">
+          {{ latestYear.composite.toFixed(1) }}
+        </div>
+        <div class="text-xs font-mono text-vs-dim mt-1">
+          {{ deltaFromBaseline >= 0 ? '↑' : '↓' }} {{ Math.abs(deltaFromBaseline).toFixed(1) }} from baseline
+        </div>
+      </div>
+    </div>
 
     <div ref="containerRef" class="w-full relative">
       <svg
@@ -276,7 +222,7 @@ watch(
           class="chart-area"
           :transform="`translate(${dimensions.margin.left}, ${dimensions.margin.top})`"
         >
-          <!-- Baseline band -->
+          <!-- Baseline band (reduced opacity) -->
           <rect
             v-if="baselineBand"
             :x="baselineBand.x"
@@ -284,7 +230,7 @@ watch(
             :width="baselineBand.width"
             :height="baselineBand.height"
             fill="#C8C3B8"
-            opacity="0.06"
+            opacity="0.03"
           />
           <!-- Baseline label -->
           <text
@@ -304,7 +250,7 @@ watch(
             :x1="launchX"
             :y1="0"
             :x2="launchX"
-            :y2="chartHeight"
+            :y2="dimensions.innerHeight"
             stroke="#C8C3B8"
             stroke-width="1.5"
             stroke-dasharray="6,4"
@@ -340,19 +286,7 @@ watch(
             stroke-linejoin="round"
           />
 
-          <!-- Data points -->
-          <circle
-            v-for="yr in years"
-            :key="yr.year"
-            :cx="xScale?.(yr.year) ?? 0"
-            :cy="yScale?.(yr.composite) ?? 0"
-            r="3"
-            :fill="COMPOSITE_COLOR"
-            stroke="#151821"
-            stroke-width="1.5"
-          />
-
-          <!-- Endpoint annotation -->
+          <!-- Endpoint dot only (no per-year dots — line IS the encoding) -->
           <g v-if="endpointPos">
             <circle
               :cx="endpointPos.x"
@@ -362,16 +296,6 @@ watch(
               stroke="#151821"
               stroke-width="2"
             />
-            <text
-              :x="endpointPos.x + 12"
-              :y="endpointPos.y + 4"
-              :fill="COMPOSITE_COLOR"
-              font-size="13"
-              font-family="'DM Mono', monospace"
-              font-weight="600"
-            >
-              {{ latestYear?.composite.toFixed(1) }}
-            </text>
           </g>
 
           <!-- Baseline average annotation -->
@@ -396,40 +320,8 @@ watch(
           >
             avg {{ baselineAvg.toFixed(1) }}
           </text>
-
-          <!-- ═══ Primary Driver Ribbon ═══ -->
-          <g :transform="`translate(0, ${chartHeight + 6 + 12})`">
-            <!-- Ribbon label -->
-            <text
-              :x="-4"
-              :y="ribbonHeight / 2 + 3"
-              text-anchor="end"
-              fill="#4d5162"
-              font-size="8"
-              font-family="'DM Mono', monospace"
-            >
-            </text>
-
-            <!-- Colored segments -->
-            <rect
-              v-for="(seg, idx) in ribbonSegments"
-              :key="idx"
-              :x="seg.x"
-              :y="0"
-              :width="Math.max(seg.width, 1)"
-              :height="ribbonHeight"
-              :fill="seg.color"
-              opacity="0.7"
-              rx="1"
-            />
-          </g>
         </g>
       </svg>
-    </div>
-
-    <!-- Ribbon legend (inline, beneath chart) -->
-    <div class="flex items-center gap-1 mt-1 ml-12 text-[8px] font-mono text-vs-dim">
-      <span>PRIMARY DRIVER</span>
     </div>
   </div>
 </template>

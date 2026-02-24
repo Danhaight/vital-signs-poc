@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ClientData, CategoryKey } from '../../data/types'
 import CompositeTrajectory from './CompositeTrajectory.vue'
-import StatusIndicators from './StatusIndicators.vue'
 import CategorySmallMultiples from './CategorySmallMultiples.vue'
 import NarrativeBlock from './NarrativeBlock.vue'
 
@@ -17,24 +16,21 @@ const emit = defineEmits<{
 <template>
   <div class="max-w-6xl mx-auto">
     <!-- Client identity -->
-    <div class="mb-10">
+    <div class="mb-6">
       <h1 class="text-2xl font-semibold tracking-tight">{{ data.config.name }}</h1>
       <p class="text-vs-muted text-sm mt-1">
         {{ data.config.toolName }} · Launched {{ data.config.launchYear }}
       </p>
     </div>
 
-    <!-- Hero chart -->
+    <!-- Hero card: chart + narrative as a single visual unit -->
     <div class="bg-vs-surface border border-vs-border rounded-lg p-6 mb-6">
       <CompositeTrajectory :data="data" />
-    </div>
 
-    <!-- Status indicators -->
-    <div class="mb-6">
-      <StatusIndicators
-        :trends="data.trends"
-        @select-category="(key) => emit('selectCategory', key)"
-      />
+      <!-- Narrative inside the hero card, separated by thin border -->
+      <div class="border-t border-vs-border/50 mt-5 pt-5">
+        <NarrativeBlock :data="data" />
+      </div>
     </div>
 
     <!-- Small multiples -->
@@ -45,13 +41,8 @@ const emit = defineEmits<{
       />
     </div>
 
-    <!-- Narrative -->
-    <div class="mb-10 mt-10">
-      <NarrativeBlock :data="data" />
-    </div>
-
     <!-- Source attribution -->
-    <p class="text-vs-dim text-xs mt-10 font-mono">
+    <p class="text-vs-dim text-xs mt-8 font-mono">
       Source: Vital Signs Framework · Darkhorse · 2026
     </p>
   </div>
