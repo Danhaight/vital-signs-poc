@@ -157,7 +157,8 @@ const series = computed<SeriesDef[]>(() => {
 
         // Build descriptive label from active filters
         const parts: string[] = []
-        if (pf.filterOrgTier.value === 'gov') parts.push('Government')
+        if (pf.filterOrgTier.value === 'legislative') parts.push('Legislative')
+        else if (pf.filterOrgTier.value === 'gov') parts.push('Government')
         else if (pf.filterOrgTier.value === 'ngo') parts.push('Think Tanks/IGOs')
         if (pf.filterCore.value === true) parts.push('Core')
         else if (pf.filterCore.value === false) parts.push('Other')

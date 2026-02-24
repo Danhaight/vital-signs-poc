@@ -17,12 +17,13 @@ import {
 import type { PolicyCitation, ClientId } from '../data/types'
 
 const GOV_ORG_TYPES = new Set(['Government', 'Legislative Body', 'Judicial Body'])
+const LEGISLATIVE_ORG_TYPES = new Set(['Legislative Body', 'Judicial Body'])
 
 // ─── Public API type ───
 
 export interface PolicyFiltersAPI {
   // Writable filter refs
-  filterOrgTier: Ref<'gov' | 'ngo' | null>
+  filterOrgTier: Ref<'gov' | 'ngo' | 'legislative' | null>
   filterCore: Ref<boolean | null>
   filterYear: Ref<number | null>
   searchQuery: Ref<string>
@@ -88,7 +89,7 @@ export function usePolicyFilters(clientId: ClientId): PolicyFiltersAPI {
   const searchQuery = ref('')
   const filterYear = ref<number | null>(null)
   const filterCore = ref<boolean | null>(null)
-  const filterOrgTier = ref<'gov' | 'ngo' | null>(null)
+  const filterOrgTier = ref<'gov' | 'ngo' | 'legislative' | null>(null)
 
   const hasChartFilter = computed(() =>
     filterOrgTier.value !== null || filterCore.value !== null,
@@ -121,6 +122,8 @@ export function usePolicyFilters(clientId: ClientId): PolicyFiltersAPI {
     if (filterOrgTier.value !== null) {
       if (filterOrgTier.value === 'gov') {
         result = result.filter(c => GOV_ORG_TYPES.has(c.orgType))
+      } else if (filterOrgTier.value === 'legislative') {
+        result = result.filter(c => LEGISLATIVE_ORG_TYPES.has(c.orgType))
       } else {
         result = result.filter(c => !GOV_ORG_TYPES.has(c.orgType))
       }
@@ -157,6 +160,8 @@ export function usePolicyFilters(clientId: ClientId): PolicyFiltersAPI {
     if (filterOrgTier.value !== null) {
       if (filterOrgTier.value === 'gov') {
         result = result.filter(c => GOV_ORG_TYPES.has(c.orgType))
+      } else if (filterOrgTier.value === 'legislative') {
+        result = result.filter(c => LEGISLATIVE_ORG_TYPES.has(c.orgType))
       } else {
         result = result.filter(c => !GOV_ORG_TYPES.has(c.orgType))
       }

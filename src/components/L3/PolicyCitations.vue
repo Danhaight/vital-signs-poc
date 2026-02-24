@@ -45,7 +45,9 @@ const groupedByYear = computed(() => {
 
 // Stats (computed from the shared allCitations)
 const GOV_ORG_TYPES = new Set(['Government', 'Legislative Body', 'Judicial Body'])
+const LEGISLATIVE_ORG_TYPES = new Set(['Legislative Body', 'Judicial Body'])
 const govCount = computed(() => allCitations.value.filter(c => GOV_ORG_TYPES.has(c.orgType)).length)
+const legislativeCount = computed(() => allCitations.value.filter(c => LEGISLATIVE_ORG_TYPES.has(c.orgType)).length)
 const uniqueOrgs = computed(() => new Set(allCitations.value.map(c => c.citingOrg)).size)
 
 function showMore() {
@@ -74,14 +76,16 @@ function clearFilters() {
 
     <template v-else>
       <!-- Stats bar -->
-      <div class="flex items-center gap-4 mb-4 text-xs font-mono text-vs-dim">
-        <span>{{ allCitations.length.toLocaleString() }} total citations</span>
+      <div class="flex items-center gap-4 mb-4 text-xs font-mono text-vs-dim flex-wrap">
+        <span>{{ allCitations.length.toLocaleString() }} total</span>
+        <span>·</span>
+        <span>{{ legislativeCount.toLocaleString() }} legislative</span>
         <span>·</span>
         <span>{{ govCount.toLocaleString() }} government</span>
         <span>·</span>
         <span>{{ (allCitations.length - govCount).toLocaleString() }} think tanks/IGOs/NGOs</span>
         <span>·</span>
-        <span>{{ uniqueOrgs }} unique organizations</span>
+        <span>{{ uniqueOrgs }} orgs</span>
       </div>
 
       <!-- Filters -->
@@ -108,6 +112,15 @@ function clearFilters() {
 
         <!-- Org tier toggle -->
         <div class="flex gap-1">
+          <button
+            @click="filterOrgTier = filterOrgTier === 'legislative' ? null : 'legislative'"
+            class="px-2 py-1 rounded text-xs font-mono transition-colors"
+            :class="filterOrgTier === 'legislative'
+              ? 'bg-[#E8C547]/20 text-[#E8C547] border border-[#E8C547]/30'
+              : 'bg-vs-bg text-vs-dim border border-vs-border hover:text-vs-muted'"
+          >
+            Legislative
+          </button>
           <button
             @click="filterOrgTier = filterOrgTier === 'gov' ? null : 'gov'"
             class="px-2 py-1 rounded text-xs font-mono transition-colors"
