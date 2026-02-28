@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* ── Vital Signs Design Tokens ──────────────────── */
+
+@theme {
+  /* Surfaces (dark theme) */
+  --color-vs-bg: #0d0f16;
+  --color-vs-surface: #151821;
+  --color-vs-border: #262a38;
+  --color-vs-text: #e2e0da;
+  --color-vs-muted: #8a8d97;
+  --color-vs-dim: #4d5162;
+
+  /* Category colors */
+  --color-cat-academic: #7B9EBD;
+  --color-cat-media: #C4956A;
+  --color-cat-awareness: #8DB580;
+  --color-cat-opinion: #B8A0CC;
+  --color-cat-policy: #D4A85C;
+
+  /* Accent (launch marker) */
+  --color-vs-accent: #D4A85C;
+
+  /* Composite line — neutral warm tone, distinct from all categories */
+  --color-vs-composite: #C8C3B8;
+
+  /* Trend indicators */
+  --color-trend-up: #8DB580;
+  --color-trend-stable: #8a8d97;
+  --color-trend-down: #C47070;
+
+  /* Fonts */
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+}
+
+/* ── Base resets ────────────────────────────────── */
+
+html {
+  background-color: var(--color-vs-bg);
+  color: var(--color-vs-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* ── SVG defaults ──────────────────────────────── */
+
+svg text {
+  font-family: var(--font-mono);
+  fill: var(--color-vs-dim);
+  font-size: 10px;
+}
+
+svg .axis path,
+svg .axis line {
+  stroke: var(--color-vs-border);
+}
+
+svg .axis text {
+  fill: var(--color-vs-dim);
+}
+
+/* ── View transitions ─────────────────────────── */
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}

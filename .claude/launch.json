@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vital-signs-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd '/Users/danielhaight/projects/Impact Tracking/vital-signs-poc' && npx vite --port 5173"],
+      "port": 5173
+    }
+  ]
+}
