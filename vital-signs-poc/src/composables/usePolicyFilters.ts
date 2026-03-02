@@ -63,10 +63,11 @@ export function usePolicyFilters(clientId: ClientId): PolicyFiltersAPI {
   const allCitations = shallowRef<PolicyCitation[]>([])
   const loading = ref(true)
 
-  // Fetch raw citation records
+  // Fetch raw citation records (use Vite's BASE_URL so paths work on GitHub Pages)
+  const base = import.meta.env.BASE_URL
   const url = clientId === 'oi'
-    ? '/data/oi-policy-citations.json'
-    : '/data/ku-policy-citations.json'
+    ? `${base}data/oi-policy-citations.json`
+    : `${base}data/ku-policy-citations.json`
 
   fetch(url)
     .then(resp => {
