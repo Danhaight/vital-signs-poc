@@ -424,27 +424,27 @@ const tooltipData = computed(() => {
         <!-- Area swatch for cumulative/stock series, line swatch for flow -->
         <span
           v-if="s.isArea"
-          class="w-4 h-2.5 rounded-sm"
-          :style="{ backgroundColor: s.color, opacity: 0.3 }"
+          class="w-4 h-2.5 rounded-[3px]"
+          :style="{ backgroundColor: s.color, opacity: 0.25 }"
         ></span>
         <span
           v-else
           class="w-4 h-0.5 rounded"
           :style="{ backgroundColor: s.color }"
         ></span>
-        <span class="text-xs text-vs-muted">{{ s.label }}</span>
+        <span class="text-[11px] text-vs-muted">{{ s.label }}</span>
       </div>
-      <div class="flex items-center gap-1.5 border-l border-vs-border pl-4">
+      <div class="flex items-center gap-1.5 border-l border-vs-border/40 pl-4">
         <span class="w-4 h-[2px] rounded" :style="{ backgroundColor: cat.color }"></span>
-        <span class="text-xs font-mono text-vs-text font-medium">Annual Score</span>
+        <span class="text-[11px] font-mono text-vs-text font-medium">Annual Score</span>
       </div>
       <!-- Opinion dashed key -->
       <div
         v-if="categoryKey === 'opinion'"
-        class="flex items-center gap-1.5 border-l border-vs-border pl-4"
+        class="flex items-center gap-1.5 border-l border-vs-border/40 pl-4"
       >
         <span class="w-4 h-0.5 border-t-2 border-dashed" :style="{ borderColor: '#B8A0CC' }"></span>
-        <span class="text-xs text-vs-dim">Carried forward</span>
+        <span class="text-[11px] text-vs-dim">Carried forward</span>
       </div>
     </div>
 
@@ -627,26 +627,26 @@ const tooltipData = computed(() => {
       <!-- Tooltip -->
       <div
         v-if="tooltipData"
-        class="absolute pointer-events-none bg-vs-bg border border-vs-border rounded-lg px-3 py-2.5 shadow-xl z-10"
+        class="absolute pointer-events-none vs-tooltip rounded-xl px-3.5 py-3 z-10 min-w-[160px]"
         :style="{
-          left: (tooltipX > dimensions.width * 0.7 ? tooltipX - 12 : tooltipX + 12) + 'px',
+          left: (tooltipX > dimensions.width * 0.7 ? tooltipX - 14 : tooltipX + 14) + 'px',
           top: Math.max(0, tooltipY - 20) + 'px',
           transform: tooltipX > dimensions.width * 0.7 ? 'translateX(-100%)' : 'none',
         }"
       >
-        <div class="text-[11px] font-mono font-semibold text-vs-text mb-1.5">{{ tooltipData.year }}</div>
-        <div v-for="s in tooltipData.series" :key="s.label" class="flex items-center gap-2 text-[11px] leading-relaxed">
-          <span class="w-2 h-2 rounded-sm shrink-0" :style="{ backgroundColor: s.color, opacity: 0.7 }"></span>
+        <div class="text-xs font-mono font-semibold text-vs-text mb-2">{{ tooltipData.year }}</div>
+        <div v-for="s in tooltipData.series" :key="s.label" class="flex items-center gap-2.5 text-[11px] leading-relaxed">
+          <span class="w-2 h-2 rounded-[3px] shrink-0" :style="{ backgroundColor: s.color, opacity: 0.65 }"></span>
           <span class="text-vs-muted flex-1">{{ s.label }}</span>
           <span class="text-vs-text font-mono tabular-nums">{{ s.value !== null ? s.value.toFixed(1) : '—' }}</span>
         </div>
         <div
           v-if="tooltipData.composite !== null"
-          class="flex items-center gap-2 text-[11px] leading-relaxed mt-1 pt-1 border-t border-vs-border/50"
+          class="flex items-center gap-2.5 text-[11px] leading-relaxed mt-1.5 pt-1.5 border-t border-vs-border/40"
         >
           <span class="w-2 h-[2px] rounded shrink-0" :style="{ backgroundColor: tooltipData.compositeColor }"></span>
           <span class="text-vs-text flex-1 font-medium">Annual Score</span>
-          <span class="text-vs-text font-mono tabular-nums">{{ tooltipData.composite.toFixed(1) }}</span>
+          <span class="text-vs-text font-mono font-semibold tabular-nums">{{ tooltipData.composite.toFixed(1) }}</span>
         </div>
       </div>
     </div>

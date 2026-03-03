@@ -31,8 +31,8 @@ export function useChartDimensions(
     dimensions.value = {
       width: w,
       height: h,
-      innerWidth: w - margin.left - margin.right,
-      innerHeight: h - margin.top - margin.bottom,
+      innerWidth: Math.max(0, w - margin.left - margin.right),
+      innerHeight: Math.max(0, h - margin.top - margin.bottom),
       margin,
     }
   }

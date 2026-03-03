@@ -23,11 +23,14 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: vital-signs-poc/package-lock.json
       - run: npm ci
+        working-directory: vital-signs-poc
       - run: npm run build
+        working-directory: vital-signs-poc
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: vital-signs-poc/dist
 
   deploy:
     environment:

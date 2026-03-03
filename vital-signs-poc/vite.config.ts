@@ -6,4 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: '/vital-signs-poc/',
   plugins: [vue(), tailwindcss()],
+  server: {
+    host: true,
+  },
 })

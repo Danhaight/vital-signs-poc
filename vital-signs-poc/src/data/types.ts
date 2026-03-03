@@ -1,4 +1,4 @@
-// === Vital Signs POC — Type Definitions ===
+// === Impact Tracker — Type Definitions ===
 
 export type ClientId = 'oi' | 'ku'
 export type CategoryKey = 'academic' | 'media' | 'awareness' | 'opinion' | 'policy'

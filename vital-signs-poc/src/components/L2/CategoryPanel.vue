@@ -27,6 +27,7 @@ const { dimensions } = useChartDimensions(
 )
 
 const svgRef = ref<SVGSVGElement | null>(null)
+const isHovered = ref(false)
 
 // Accessor for this category's score
 const accessor = (d: ComputedYear): number => d[props.categoryKey]
@@ -64,6 +65,18 @@ const linePath = computed(() => {
   return gen(props.years) ?? ''
 })
 
+// Area path (for gradient fill under the line)
+const areaPath = computed(() => {
+  if (!xScale.value || !yScale.value) return ''
+  const gen = d3
+    .area<ComputedYear>()
+    .x(d => xScale.value!(d.year))
+    .y0(dimensions.value.innerHeight)
+    .y1(d => yScale.value!(accessor(d)))
+    .curve(d3.curveLinear)
+  return gen(props.years) ?? ''
+})
+
 // Launch marker
 const launchX = computed(() => {
   if (!xScale.value) return 0
@@ -79,9 +92,9 @@ const baselineBand = computed(() => {
 })
 
 const trendColor = computed(() => {
-  if (props.trend === 'strengthening') return '#8DB580'
-  if (props.trend === 'weakening') return '#C47070'
-  return '#8a8d97'
+  if (props.trend === 'strengthening') return '#7DBF6C'
+  if (props.trend === 'weakening') return '#D06666'
+  return '#8b8e99'
 })
 
 // Subtle horizontal gridlines — no axis labels, just faint reference marks
@@ -99,7 +112,7 @@ function renderGridlines() {
     .attr('x2', dimensions.value.innerWidth)
     .attr('y1', yScale.value(50))
     .attr('y2', yScale.value(50))
-    .attr('stroke', '#262a38')
+    .attr('stroke', '#1e2333')
     .attr('stroke-dasharray', '2,3')
 }
 
@@ -110,25 +123,42 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
 <template>
   <button
     @click="emit('select', categoryKey)"
-    class="bg-vs-surface border border-vs-border rounded-lg p-3 pb-2
-           hover:border-vs-muted/40 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20
-           transition-all duration-150 cursor-pointer text-left
-           group relative"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false"
+    class="vs-glass rounded-xl p-3.5 pb-2
+           hover:-translate-y-0.5
+           transition-all duration-250 cursor-pointer text-left
+           group relative overflow-hidden"
+    :style="{
+      boxShadow: isHovered
+        ? `0 0 0 1px ${cat.color}22, 0 4px 20px -4px rgba(0,0,0,0.3), 0 0 30px -10px ${cat.color}15`
+        : '0 0 0 1px rgba(255,255,255,0.02) inset, 0 1px 2px rgba(0,0,0,0.15)',
+      borderColor: isHovered ? cat.color + '30' : undefined,
+    }"
   >
+    <!-- Subtle category-colored glow on hover -->
+    <div
+      class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+      :style="{ background: `radial-gradient(ellipse at 50% 0%, ${cat.color}08, transparent 70%)` }"
+    ></div>
+
     <!-- Header: color dot + mixed-case name + score + trend -->
-    <div class="flex items-center justify-between mb-1">
+    <div class="flex items-center justify-between mb-1.5 relative">
       <div class="flex items-center gap-1.5">
         <span
-          class="w-1.5 h-1.5 rounded-full"
-          :style="{ backgroundColor: cat.color }"
+          class="w-1.5 h-1.5 rounded-full transition-shadow duration-300"
+          :style="{
+            backgroundColor: cat.color,
+            boxShadow: isHovered ? `0 0 6px ${cat.color}60` : 'none',
+          }"
         ></span>
-        <span class="text-[10px] text-vs-muted group-hover:text-vs-text transition-colors">
+        <span class="text-[10px] text-vs-muted group-hover:text-vs-text transition-colors duration-200">
           {{ cat.label }}
         </span>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-1.5">
         <span
-          class="font-mono text-xs font-semibold"
+          class="font-mono text-xs font-semibold tabular-nums"
           :style="{ color: cat.color }"
         >
           {{ latestValue.toFixed(0) }}
@@ -163,7 +193,7 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
     </div>
 
     <!-- Chart (no y-axis labels — "remove to improve") -->
-    <div ref="containerRef" class="w-full">
+    <div ref="containerRef" class="w-full relative">
       <svg
         v-if="dimensions.width > 0"
         ref="svgRef"
@@ -171,6 +201,13 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
         :height="dimensions.height"
         class="overflow-visible"
       >
+        <defs>
+          <!-- Gradient fill for area under the line -->
+          <linearGradient :id="'panel-grad-' + categoryKey" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" :stop-color="cat.color" stop-opacity="0.15"/>
+            <stop offset="100%" :stop-color="cat.color" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
         <g
           class="chart-area"
           :transform="`translate(${dimensions.margin.left}, ${dimensions.margin.top})`"
@@ -195,7 +232,13 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
             :stroke="cat.color"
             stroke-width="1"
             stroke-dasharray="3,3"
-            opacity="0.3"
+            opacity="0.2"
+          />
+
+          <!-- Area fill -->
+          <path
+            :d="areaPath"
+            :fill="`url(#panel-grad-${categoryKey})`"
           />
 
           <!-- Line -->
@@ -208,18 +251,36 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
             stroke-linejoin="round"
           />
 
-          <!-- Endpoint dot -->
-          <circle
-            v-if="xScale && yScale && years.length > 0"
-            :cx="xScale(years[years.length - 1]!.year)"
-            :cy="yScale(accessor(years[years.length - 1]!))"
-            r="3"
-            :fill="cat.color"
-            stroke="#151821"
-            stroke-width="1.5"
-          />
+          <!-- Endpoint dot with glow -->
+          <g v-if="xScale && yScale && years.length > 0">
+            <circle
+              :cx="xScale(years[years.length - 1]!.year)"
+              :cy="yScale(accessor(years[years.length - 1]!))"
+              r="6"
+              :fill="cat.color"
+              opacity="0.1"
+            />
+            <circle
+              :cx="xScale(years[years.length - 1]!.year)"
+              :cy="yScale(accessor(years[years.length - 1]!))"
+              r="3"
+              :fill="cat.color"
+              stroke="#12151e"
+              stroke-width="1.5"
+            />
+          </g>
         </g>
       </svg>
+    </div>
+
+    <!-- Expand hint on hover -->
+    <div class="flex items-center justify-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <span class="text-[9px] text-vs-dim flex items-center gap-1">
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+          <path d="M1 3L4 6L7 3" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        explore
+      </span>
     </div>
   </button>
 </template>

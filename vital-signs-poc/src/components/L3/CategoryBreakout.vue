@@ -29,9 +29,9 @@ const latestValue = computed(() => {
 })
 
 const trendColor = computed(() => {
-  if (trend.value === 'strengthening') return '#8DB580'
-  if (trend.value === 'weakening') return '#C47070'
-  return '#8a8d97'
+  if (trend.value === 'strengthening') return '#7DBF6C'
+  if (trend.value === 'weakening') return '#D06666'
+  return '#8b8e99'
 })
 
 // Escape key handler
@@ -44,16 +44,16 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto">
+  <div class="max-w-6xl mx-auto animate-slide-up">
     <!-- Category header -->
-    <div class="mb-5">
+    <div class="mb-6">
       <div class="flex items-center gap-3 mb-2">
-        <span
+        <div
           class="w-3 h-3 rounded-full"
-          :style="{ backgroundColor: cat.color }"
-        ></span>
+          :style="{ backgroundColor: cat.color, boxShadow: `0 0 10px ${cat.color}40` }"
+        ></div>
         <h1
-          class="text-2xl font-semibold tracking-tight"
+          class="text-[26px] font-semibold tracking-tight"
           :style="{ color: cat.color }"
         >
           {{ cat.label }}
@@ -65,18 +65,19 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
       </p>
 
       <!-- Current score badge -->
-      <div class="flex items-center gap-3 mt-4">
-        <div class="flex items-baseline gap-1">
+      <div class="flex items-center gap-4 mt-5">
+        <div class="flex items-baseline gap-1.5">
           <span
-            class="text-3xl font-mono font-semibold"
+            class="text-[36px] font-mono font-bold tracking-tight leading-none"
             :style="{ color: cat.color }"
           >
             {{ latestValue.toFixed(0) }}
           </span>
-          <span class="text-vs-dim text-sm font-mono">/100</span>
+          <span class="text-vs-dim/60 text-sm font-mono">/100</span>
         </div>
+        <div class="h-6 w-px bg-vs-border/40"></div>
         <span
-          class="text-sm font-mono font-medium flex items-center gap-1"
+          class="text-sm font-mono font-semibold flex items-center gap-1.5"
           :style="{ color: trendColor }"
         >
           <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
@@ -105,11 +106,11 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
     </div>
 
     <!-- Chart + Narrative side-by-side -->
-    <div class="bg-vs-surface border border-vs-border rounded-lg p-6 mb-6">
-      <div class="flex gap-6">
+    <div class="vs-glass-raised rounded-xl p-7 mb-8">
+      <div class="flex gap-8">
         <!-- Chart: takes ~67% -->
         <div class="flex-[4] min-w-0">
-          <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider mb-3">
+          <h3 class="text-xs font-semibold text-vs-muted uppercase tracking-[0.12em] mb-4">
             Sub-Component Decomposition
           </h3>
           <SubComponentChart
@@ -118,13 +119,13 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           />
         </div>
 
-        <!-- Narrative: takes ~38% -->
-        <div class="flex-[2] min-w-0 flex flex-col justify-between border-l border-vs-border pl-6">
+        <!-- Narrative: takes ~33% -->
+        <div class="flex-[2] min-w-0 flex flex-col justify-between border-l border-vs-border/30 pl-7">
           <CategoryNarrative
             :data="data"
             :category-key="categoryKey"
           />
-          <p class="text-vs-dim text-xs font-mono mt-4">
+          <p class="text-vs-dim text-[10px] font-mono mt-5 pt-4 border-t border-vs-border/20">
             Sources: {{ cat.sources.join(', ') }} · {{ data.config.yearRange[0] }}–{{ data.config.yearRange[1] }}
           </p>
         </div>
@@ -132,7 +133,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
     </div>
 
     <!-- Policy citations (only for policy category) -->
-    <div v-if="categoryKey === 'policy'" class="mb-6">
+    <div v-if="categoryKey === 'policy'" class="mb-8">
       <PolicyCitations />
     </div>
   </div>

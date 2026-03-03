@@ -71,7 +71,10 @@ const narrative = computed(() => {
 
 <template>
   <div>
-    <p class="text-[14px] leading-[1.7] text-vs-text/90">
+    <h3 class="text-[10px] font-semibold text-vs-muted uppercase tracking-[0.14em] mb-3">
+      Analysis
+    </h3>
+    <p class="text-[13.5px] leading-[1.75] text-vs-text/85">
       {{ narrative }}
     </p>
   </div>

@@ -132,14 +132,14 @@ const caveatSentence = computed(() => {
 
 <template>
   <div>
-    <div class="space-y-2.5 text-[14px] leading-[1.7] text-vs-text/85">
+    <div class="space-y-3 text-[13.5px] leading-[1.75] text-vs-text/80">
       <p>{{ openingSentence }}</p>
 
       <p v-if="trendSentence">{{ trendSentence }}</p>
 
       <p>{{ decompositionSentence }} {{ strengthSentence }}</p>
 
-      <p class="text-vs-muted text-[12px] leading-[1.65] italic">
+      <p class="text-vs-dim text-[11.5px] leading-[1.65] italic border-l-2 border-vs-border/40 pl-3">
         {{ caveatSentence }}
       </p>
     </div>

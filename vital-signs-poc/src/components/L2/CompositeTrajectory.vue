@@ -148,7 +148,7 @@ function separatorLineForSeries(series: d3.Series<typeof cumulativeStackData.val
 
 // Color lookup
 function categoryColor(key: string): string {
-  return CATEGORY_MAP[key as CategoryKey]?.color ?? '#C8C3B8'
+  return CATEGORY_MAP[key as CategoryKey]?.color ?? '#CCC7BB'
 }
 
 // Baseline band
@@ -256,7 +256,7 @@ function renderAxes() {
     )
     .call(g => g.select('.domain').remove())
     .selectAll('text')
-    .style('fill', '#4d5162')
+    .style('fill', '#4a4e5e')
     .style('font-family', "'DM Mono', monospace")
     .style('font-size', '11px')
 
@@ -279,11 +279,11 @@ function renderAxes() {
     .call(g =>
       g
         .selectAll('.tick line')
-        .attr('stroke', '#262a38')
+        .attr('stroke', '#1e2333')
         .attr('stroke-dasharray', '2,3'),
     )
     .selectAll('text')
-    .style('fill', '#4d5162')
+    .style('fill', '#4a4e5e')
     .style('font-family', "'DM Mono', monospace")
     .style('font-size', '10px')
 }
@@ -347,21 +347,21 @@ const tooltipData = computed(() => {
 <template>
   <div class="w-full">
     <!-- Header with title + score callout -->
-    <div class="flex items-start justify-between mb-4">
+    <div class="flex items-start justify-between mb-5">
       <div>
-        <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider">
-          Cumulative Vital Signs Impact
+        <h3 class="text-xs font-semibold text-vs-muted uppercase tracking-[0.12em]">
+          Cumulative Impact Score
         </h3>
         <!-- Inline legend -->
-        <div class="flex items-center gap-3 mt-2 flex-wrap">
+        <div class="flex items-center gap-3 mt-2.5 flex-wrap">
           <div
             v-for="item in legendItems"
             :key="item.key"
             class="flex items-center gap-1.5"
           >
             <span
-              class="w-2.5 h-2.5 rounded-sm inline-block"
-              :style="{ backgroundColor: item.color, opacity: 0.7 }"
+              class="w-2 h-2 rounded-[3px] inline-block"
+              :style="{ backgroundColor: item.color, opacity: 0.65 }"
             />
             <span class="text-[10px] text-vs-dim">
               {{ item.label.split(' ')[0] }}
@@ -372,22 +372,28 @@ const tooltipData = computed(() => {
 
       <!-- Score callout — current composite as hero, cumulative secondary -->
       <div v-if="latestYear" class="text-right">
-        <div class="flex items-baseline justify-end gap-1">
-          <span class="text-[32px] font-mono font-bold leading-none" style="color: #C8C3B8">
+        <div class="flex items-baseline justify-end gap-1.5">
+          <span class="text-[36px] font-mono font-bold leading-none tracking-tight" style="color: #CCC7BB">
             {{ latestYear.composite.toFixed(1) }}
           </span>
-          <span class="text-sm font-mono text-vs-dim">/100</span>
+          <span class="text-sm font-mono text-vs-dim/70">/100</span>
         </div>
-        <div class="flex items-center justify-end gap-2 mt-1">
-          <span class="text-[11px] font-mono text-vs-dim">current score</span>
+        <div class="flex items-center justify-end gap-2 mt-1.5">
+          <span class="text-[11px] text-vs-dim">current score</span>
           <span
-            class="text-[11px] font-mono font-medium"
+            class="text-[11px] font-mono font-semibold inline-flex items-center gap-0.5"
             :class="deltaFromBaseline >= 0 ? 'text-trend-up' : 'text-trend-down'"
           >
-            {{ deltaFromBaseline >= 0 ? '↑' : '↓' }}{{ Math.abs(deltaFromBaseline).toFixed(1) }}
+            <svg v-if="deltaFromBaseline >= 0" width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M5 2L8 6H2L5 2Z" fill="currentColor"/>
+            </svg>
+            <svg v-else width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M5 8L2 4H8L5 8Z" fill="currentColor"/>
+            </svg>
+            {{ Math.abs(deltaFromBaseline).toFixed(1) }}
           </span>
         </div>
-        <div class="text-[11px] font-mono text-vs-dim mt-1.5">
+        <div class="text-[11px] font-mono text-vs-dim/60 mt-2">
           {{ Math.round(latestCumulative) }} cumulative pts
         </div>
       </div>
@@ -401,6 +407,28 @@ const tooltipData = computed(() => {
         :height="dimensions.height"
         class="overflow-visible"
       >
+        <!-- Gradient defs for area fills -->
+        <defs>
+          <linearGradient
+            v-for="key in STACK_KEYS"
+            :key="'grad-' + key"
+            :id="'area-grad-' + key"
+            x1="0" y1="0" x2="0" y2="1"
+          >
+            <stop offset="0%" :stop-color="categoryColor(key)" stop-opacity="0.65"/>
+            <stop offset="100%" :stop-color="categoryColor(key)" stop-opacity="0.35"/>
+          </linearGradient>
+
+          <!-- Composite line glow -->
+          <filter id="composite-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
         <g
           class="chart-area"
           :transform="`translate(${dimensions.margin.left}, ${dimensions.margin.top})`"
@@ -412,7 +440,7 @@ const tooltipData = computed(() => {
             :y="0"
             :width="baselineBand.width"
             :height="baselineBand.height"
-            fill="#C8C3B8"
+            fill="#CCC7BB"
             opacity="0.03"
           />
           <text
@@ -420,9 +448,10 @@ const tooltipData = computed(() => {
             :x="baselineBand.x + baselineBand.width / 2"
             :y="-8"
             text-anchor="middle"
-            fill="#4d5162"
+            fill="#4a4e5e"
             font-size="9"
             font-family="'DM Mono', monospace"
+            letter-spacing="0.05em"
           >
             BASELINE
           </text>
@@ -433,30 +462,30 @@ const tooltipData = computed(() => {
             :y1="0"
             :x2="launchX"
             :y2="dimensions.innerHeight"
-            stroke="#C8C3B8"
-            stroke-width="1.5"
-            stroke-dasharray="6,4"
-            opacity="0.5"
+            stroke="#CCC7BB"
+            stroke-width="1"
+            stroke-dasharray="4,4"
+            opacity="0.35"
           />
           <text
             :x="launchX"
             :y="-8"
             text-anchor="middle"
-            fill="#C8C3B8"
+            fill="#CCC7BB"
             font-size="9"
             font-family="'DM Mono', monospace"
             font-weight="500"
+            letter-spacing="0.05em"
           >
             LAUNCH {{ config.launchYear }}
           </text>
 
-          <!-- Stacked area layers (cumulative) -->
+          <!-- Stacked area layers (cumulative) with gradients -->
           <path
             v-for="series in stackedSeries"
             :key="series.key"
             :d="areaForSeries(series)"
-            :fill="categoryColor(series.key)"
-            :opacity="0.55"
+            :fill="`url(#area-grad-${series.key})`"
           />
 
           <!-- Thin separator lines between layers -->
@@ -465,30 +494,48 @@ const tooltipData = computed(() => {
             :key="'line-' + series.key"
             :d="separatorLineForSeries(series)"
             fill="none"
-            stroke="#151821"
+            stroke="#12151e"
             stroke-width="0.5"
-            opacity="0.6"
+            opacity="0.5"
           />
 
-          <!-- Composite top-edge line -->
+          <!-- Composite top-edge line with glow -->
           <path
             :d="compositeLinePath"
             fill="none"
-            stroke="#C8C3B8"
+            stroke="#CCC7BB"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            opacity="0.5"
+            filter="url(#composite-glow)"
+          />
+          <path
+            :d="compositeLinePath"
+            fill="none"
+            stroke="#CCC7BB"
             stroke-width="1.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            opacity="0.6"
+            opacity="0.7"
           />
 
           <!-- Endpoint dot at cumulative top -->
           <g v-if="endpointPos">
+            <!-- Outer glow -->
+            <circle
+              :cx="endpointPos.x"
+              :cy="endpointPos.y"
+              r="8"
+              fill="#CCC7BB"
+              opacity="0.08"
+            />
             <circle
               :cx="endpointPos.x"
               :cy="endpointPos.y"
               r="5"
-              fill="#C8C3B8"
-              stroke="#151821"
+              fill="#CCC7BB"
+              stroke="#12151e"
               stroke-width="2"
             />
           </g>
@@ -509,10 +556,10 @@ const tooltipData = computed(() => {
             :y1="0"
             :x2="xScale(hoverYear)"
             :y2="dimensions.innerHeight"
-            stroke="#C8C3B8"
+            stroke="#CCC7BB"
             stroke-width="1"
             stroke-dasharray="3,3"
-            opacity="0.3"
+            opacity="0.25"
             pointer-events="none"
           />
         </g>
@@ -521,35 +568,35 @@ const tooltipData = computed(() => {
       <!-- Tooltip -->
       <div
         v-if="tooltipData"
-        class="absolute pointer-events-none bg-vs-bg border border-vs-border rounded-lg px-3 py-2.5 shadow-xl z-10"
+        class="absolute pointer-events-none vs-tooltip rounded-xl px-3.5 py-3 z-10 min-w-[160px]"
         :style="{
-          left: (tooltipX > dimensions.width * 0.7 ? tooltipX - 12 : tooltipX + 12) + 'px',
+          left: (tooltipX > dimensions.width * 0.7 ? tooltipX - 14 : tooltipX + 14) + 'px',
           top: Math.max(0, tooltipY - 20) + 'px',
           transform: tooltipX > dimensions.width * 0.7 ? 'translateX(-100%)' : 'none',
         }"
       >
-        <div class="text-[11px] font-mono font-semibold text-vs-text mb-1.5">{{ tooltipData.year }}</div>
+        <div class="text-xs font-mono font-semibold text-vs-text mb-2">{{ tooltipData.year }}</div>
         <!-- Per-category cumulative breakdown -->
-        <div v-for="c in tooltipData.categories" :key="c.label" class="flex items-center gap-2 text-[11px] leading-relaxed">
-          <span class="w-2 h-2 rounded-sm shrink-0" :style="{ backgroundColor: c.color, opacity: 0.7 }"></span>
+        <div v-for="c in tooltipData.categories" :key="c.label" class="flex items-center gap-2.5 text-[11px] leading-relaxed">
+          <span class="w-2 h-2 rounded-[3px] shrink-0" :style="{ backgroundColor: c.color, opacity: 0.65 }"></span>
           <span class="text-vs-muted flex-1">{{ c.label }}</span>
           <span class="text-vs-text font-mono tabular-nums">{{ c.value !== null ? c.value.toFixed(1) : '—' }}</span>
         </div>
         <!-- Cumulative total -->
         <div
           v-if="tooltipData.cumulativeTotal !== null"
-          class="flex items-center gap-2 text-[11px] leading-relaxed mt-1 pt-1 border-t border-vs-border/50"
+          class="flex items-center gap-2.5 text-[11px] leading-relaxed mt-1.5 pt-1.5 border-t border-vs-border/40"
         >
-          <span class="w-2 h-[2px] rounded shrink-0" style="background-color: #C8C3B8"></span>
+          <span class="w-2 h-[2px] rounded shrink-0" style="background-color: #CCC7BB"></span>
           <span class="text-vs-text flex-1 font-medium">Cumulative</span>
-          <span class="text-vs-text font-mono tabular-nums">{{ tooltipData.cumulativeTotal.toFixed(1) }}</span>
+          <span class="text-vs-text font-mono font-semibold tabular-nums">{{ tooltipData.cumulativeTotal.toFixed(1) }}</span>
         </div>
         <!-- Annual composite -->
         <div
           v-if="tooltipData.annualComposite !== null"
-          class="flex items-center gap-2 text-[11px] leading-relaxed mt-0.5"
+          class="flex items-center gap-2.5 text-[11px] leading-relaxed mt-0.5"
         >
-          <span class="w-2 h-[2px] rounded shrink-0 opacity-50" style="background-color: #C8C3B8"></span>
+          <span class="w-2 h-[2px] rounded shrink-0 opacity-40" style="background-color: #CCC7BB"></span>
           <span class="text-vs-dim flex-1">Annual</span>
           <span class="text-vs-dim font-mono tabular-nums">{{ tooltipData.annualComposite.toFixed(1) }}</span>
         </div>

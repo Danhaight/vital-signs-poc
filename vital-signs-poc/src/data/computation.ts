@@ -1,5 +1,5 @@
 /**
- * Vital Signs Computation Pipeline
+ * Impact Tracker Computation Pipeline
  *
  * All five categories now produce FLOW (point-in-time) scores at L2:
  * - Academic & Media use annual marginal values (new pubs/cites/interviews this year)
@@ -55,9 +55,11 @@ function minMaxRescale(z: number, minZ: number, maxZ: number): number {
   return ((z - minZ) / (maxZ - minZ)) * 100
 }
 
-/** Compute annual marginal (delta) from cumulative series */
+/** Compute annual marginal (delta) from cumulative series.
+ *  Clamps to 0 — cumulative data may contain corrections (non-monotonic),
+ *  but negative "new publications" etc. are meaningless for scoring. */
 function annualDelta(values: number[]): number[] {
-  return values.map((v, i) => (i === 0 ? v : v - values[i - 1]!))
+  return values.map((v, i) => (i === 0 ? v : Math.max(0, v - values[i - 1]!)))
 }
 
 /** Compute contributions and primary driver */
@@ -151,21 +153,28 @@ function computeOI(): ComputedYear[] {
     const policyAnnual = policyByYear.get(d.year)?.total ?? 0
     const policy = maxNorm(policyAnnual, maxPolicy)
 
+    // Clamp all category scores to [0, 100] before compositing
+    const cAcademic = clamp100(academic)
+    const cMedia = clamp100(media)
+    const cAwareness = clamp100(awareness)
+    const cOpinion = clamp100(opinion)
+    const cPolicy = clamp100(policy)
+
     const scores: Record<CategoryKey, number> = {
-      academic: round2(academic),
-      media: round2(media),
-      awareness: round2(awareness),
-      opinion: round2(opinion),
-      policy: round2(policy),
+      academic: round2(cAcademic),
+      media: round2(cMedia),
+      awareness: round2(cAwareness),
+      opinion: round2(cOpinion),
+      policy: round2(cPolicy),
     }
 
-    // Composite
+    // Composite (from clamped values)
     const composite =
-      WEIGHTS.academic * academic +
-      WEIGHTS.media * media +
-      WEIGHTS.awareness * awareness +
-      WEIGHTS.opinion * opinion +
-      WEIGHTS.policy * policy
+      WEIGHTS.academic * cAcademic +
+      WEIGHTS.media * cMedia +
+      WEIGHTS.awareness * cAwareness +
+      WEIGHTS.opinion * cOpinion +
+      WEIGHTS.policy * cPolicy
 
     const { contributions, primaryDriver } = computeContributions(scores)
 
@@ -243,20 +252,27 @@ function computeKU(): ComputedYear[] {
     const policyAnnualVal = policyByYear.get(d.year)?.total ?? 0
     const policy = maxPolicy > 0 ? maxNorm(policyAnnualVal, maxPolicy) : 0
 
+    // Clamp all category scores to [0, 100] before compositing
+    const cAcademic = clamp100(academic)
+    const cMedia = clamp100(media)
+    const cAwareness = clamp100(awareness)
+    const cOpinion = clamp100(opinion)
+    const cPolicy = clamp100(policy)
+
     const scores: Record<CategoryKey, number> = {
-      academic: round2(academic),
-      media: round2(media),
-      awareness: round2(awareness),
-      opinion: round2(opinion),
-      policy: round2(policy),
+      academic: round2(cAcademic),
+      media: round2(cMedia),
+      awareness: round2(cAwareness),
+      opinion: round2(cOpinion),
+      policy: round2(cPolicy),
     }
 
     const composite =
-      WEIGHTS.academic * academic +
-      WEIGHTS.media * media +
-      WEIGHTS.awareness * awareness +
-      WEIGHTS.opinion * opinion +
-      WEIGHTS.policy * policy
+      WEIGHTS.academic * cAcademic +
+      WEIGHTS.media * cMedia +
+      WEIGHTS.awareness * cAwareness +
+      WEIGHTS.opinion * cOpinion +
+      WEIGHTS.policy * cPolicy
 
     const { contributions, primaryDriver } = computeContributions(scores)
 
@@ -319,6 +335,11 @@ function getPolicyByYear(client: ClientId): Map<number, { core: number; other: n
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+/** Clamp a score to the valid 0–100 range */
+function clamp100(n: number): number {
+  return Math.max(0, Math.min(100, n))
 }
 
 export function computeClientData(clientId: ClientId): ClientData {

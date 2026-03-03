@@ -14,7 +14,7 @@ const emit = defineEmits<{
 
 <template>
   <div>
-    <div class="grid grid-cols-5 gap-3">
+    <div class="grid grid-cols-5 gap-3 stagger-children">
       <CategoryPanel
         v-for="cat in CATEGORIES"
         :key="cat.key"
