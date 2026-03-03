@@ -78,13 +78,6 @@ const baselineBand = computed(() => {
   return { x: x1, width: x2 - x1 }
 })
 
-// Trend icon
-const trendIcon = computed(() => {
-  if (props.trend === 'strengthening') return '↑'
-  if (props.trend === 'weakening') return '↓'
-  return '→'
-})
-
 const trendColor = computed(() => {
   if (props.trend === 'strengthening') return '#8DB580'
   if (props.trend === 'weakening') return '#C47070'
@@ -118,7 +111,8 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
   <button
     @click="emit('select', categoryKey)"
     class="bg-vs-surface border border-vs-border rounded-lg p-3 pb-2
-           hover:border-vs-muted/40 transition-all cursor-pointer text-left
+           hover:border-vs-muted/40 hover:-translate-y-px hover:shadow-lg hover:shadow-black/20
+           transition-all duration-150 cursor-pointer text-left
            group relative"
   >
     <!-- Header: color dot + mixed-case name + score + trend -->
@@ -128,7 +122,7 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
           class="w-1.5 h-1.5 rounded-full"
           :style="{ backgroundColor: cat.color }"
         ></span>
-        <span class="text-[10px] font-mono text-vs-muted group-hover:text-vs-text transition-colors">
+        <span class="text-[10px] text-vs-muted group-hover:text-vs-text transition-colors">
           {{ cat.label }}
         </span>
       </div>
@@ -139,12 +133,32 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
         >
           {{ latestValue.toFixed(0) }}
         </span>
-        <span
-          class="font-mono text-[10px]"
+        <svg
+          width="10" height="10" viewBox="0 0 10 10" fill="none"
           :style="{ color: trendColor }"
         >
-          {{ trendIcon }}
-        </span>
+          <!-- Up arrow -->
+          <path
+            v-if="trend === 'strengthening'"
+            d="M5 2L8 6H2L5 2Z"
+            fill="currentColor"
+          />
+          <!-- Down arrow -->
+          <path
+            v-else-if="trend === 'weakening'"
+            d="M5 8L2 4H8L5 8Z"
+            fill="currentColor"
+          />
+          <!-- Right arrow (stable) -->
+          <path
+            v-else
+            d="M2 5H7M7 5L5 3M7 5L5 7"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
       </div>
     </div>
 

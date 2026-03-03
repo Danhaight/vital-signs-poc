@@ -19,7 +19,7 @@ const containerRef = ref<HTMLElement | null>(null)
 const { dimensions } = useChartDimensions(
   containerRef,
   { top: 28, right: 72, bottom: 36, left: 48 },
-  0.28,
+  0.40,
 )
 const svgRef = ref<SVGSVGElement | null>(null)
 
@@ -203,7 +203,7 @@ const series = computed<SeriesDef[]>(() => {
 // Category composite line (weighted flow score from L2)
 const compositeSeries = computed<SeriesDef>(() => ({
   key: 'composite',
-  label: 'Annual Score (L2)',
+  label: 'Annual Score',
   color: cat.value.color,
   values: props.data.years.map(y => ({
     year: y.year,
@@ -318,7 +318,11 @@ const xTicks = computed(() => {
   const step = span > 12 ? 4 : span > 8 ? 2 : 1
   const ticks: number[] = []
   for (let y = start; y <= end; y += step) ticks.push(y)
-  if (ticks[ticks.length - 1] !== end) ticks.push(end)
+  // Only append end year if sufficiently far from the last tick to avoid cramped labels
+  const last = ticks[ticks.length - 1]!
+  if (last !== end && (end - last) > step / 2) {
+    ticks.push(end)
+  }
   return ticks
 })
 
@@ -369,6 +373,43 @@ function renderAxes() {
 
 onMounted(renderAxes)
 watch(() => [dimensions.value, props.data, props.categoryKey], renderAxes, { deep: true })
+
+// ─── Tooltip ───
+const hoverYear = ref<number | null>(null)
+const tooltipX = ref(0)
+const tooltipY = ref(0)
+
+function onChartMouseMove(event: MouseEvent) {
+  if (!xScale.value || !svgRef.value) return
+  const rect = svgRef.value.getBoundingClientRect()
+  const mouseX = event.clientX - rect.left - dimensions.value.margin.left
+  const [start, end] = config.value.yearRange
+  const rawYear = xScale.value.invert(mouseX)
+  const nearestYear = Math.round(Math.max(start, Math.min(end, rawYear)))
+  hoverYear.value = nearestYear
+  tooltipX.value = event.clientX - rect.left
+  tooltipY.value = event.clientY - rect.top
+}
+
+function onChartMouseLeave() {
+  hoverYear.value = null
+}
+
+const tooltipData = computed(() => {
+  if (hoverYear.value === null) return null
+  const yr = hoverYear.value
+  const seriesValues = series.value.map(s => {
+    const point = s.values.find(v => v.year === yr)
+    return { label: s.label, color: s.color, value: point?.value ?? null }
+  })
+  const compositePoint = compositeSeries.value.values.find(v => v.year === yr)
+  return {
+    year: yr,
+    series: seriesValues,
+    composite: props.categoryKey !== 'opinion' ? (compositePoint?.value ?? null) : null,
+    compositeColor: cat.value.color,
+  }
+})
 </script>
 
 <template>
@@ -391,11 +432,11 @@ watch(() => [dimensions.value, props.data, props.categoryKey], renderAxes, { dee
           class="w-4 h-0.5 rounded"
           :style="{ backgroundColor: s.color }"
         ></span>
-        <span class="text-xs font-mono text-vs-muted">{{ s.label }}</span>
+        <span class="text-xs text-vs-muted">{{ s.label }}</span>
       </div>
       <div class="flex items-center gap-1.5 border-l border-vs-border pl-4">
         <span class="w-4 h-[2px] rounded" :style="{ backgroundColor: cat.color }"></span>
-        <span class="text-xs font-mono text-vs-text font-medium">Annual Score (L2)</span>
+        <span class="text-xs font-mono text-vs-text font-medium">Annual Score</span>
       </div>
       <!-- Opinion dashed key -->
       <div
@@ -403,11 +444,11 @@ watch(() => [dimensions.value, props.data, props.categoryKey], renderAxes, { dee
         class="flex items-center gap-1.5 border-l border-vs-border pl-4"
       >
         <span class="w-4 h-0.5 border-t-2 border-dashed" :style="{ borderColor: '#B8A0CC' }"></span>
-        <span class="text-xs font-mono text-vs-dim">Carried forward</span>
+        <span class="text-xs text-vs-dim">Carried forward</span>
       </div>
     </div>
 
-    <div ref="containerRef" class="w-full">
+    <div ref="containerRef" class="w-full relative">
       <svg
         v-if="dimensions.width > 0"
         ref="svgRef"
@@ -532,7 +573,7 @@ watch(() => [dimensions.value, props.data, props.categoryKey], renderAxes, { dee
               font-size="10"
               font-family="'DM Mono', monospace"
             >
-              {{ s.values[s.values.length - 1]!.value.toFixed(0) }}
+              {{ s.values[s.values.length - 1]!.value.toFixed(1) }}
             </text>
           </template>
 
@@ -557,8 +598,57 @@ watch(() => [dimensions.value, props.data, props.categoryKey], renderAxes, { dee
               {{ compositeSeries.values[compositeSeries.values.length - 1]!.value.toFixed(1) }}
             </text>
           </template>
+
+          <!-- Hover overlay -->
+          <rect
+            :width="dimensions.innerWidth"
+            :height="dimensions.innerHeight"
+            fill="transparent"
+            @mousemove="onChartMouseMove"
+            @mouseleave="onChartMouseLeave"
+            style="cursor: crosshair"
+          />
+          <!-- Vertical crosshair -->
+          <line
+            v-if="hoverYear !== null && xScale"
+            :x1="xScale(hoverYear)"
+            :y1="0"
+            :x2="xScale(hoverYear)"
+            :y2="dimensions.innerHeight"
+            stroke="#C8C3B8"
+            stroke-width="1"
+            stroke-dasharray="3,3"
+            opacity="0.3"
+            pointer-events="none"
+          />
         </g>
       </svg>
+
+      <!-- Tooltip -->
+      <div
+        v-if="tooltipData"
+        class="absolute pointer-events-none bg-vs-bg border border-vs-border rounded-lg px-3 py-2.5 shadow-xl z-10"
+        :style="{
+          left: (tooltipX > dimensions.width * 0.7 ? tooltipX - 12 : tooltipX + 12) + 'px',
+          top: Math.max(0, tooltipY - 20) + 'px',
+          transform: tooltipX > dimensions.width * 0.7 ? 'translateX(-100%)' : 'none',
+        }"
+      >
+        <div class="text-[11px] font-mono font-semibold text-vs-text mb-1.5">{{ tooltipData.year }}</div>
+        <div v-for="s in tooltipData.series" :key="s.label" class="flex items-center gap-2 text-[11px] leading-relaxed">
+          <span class="w-2 h-2 rounded-sm shrink-0" :style="{ backgroundColor: s.color, opacity: 0.7 }"></span>
+          <span class="text-vs-muted flex-1">{{ s.label }}</span>
+          <span class="text-vs-text font-mono tabular-nums">{{ s.value !== null ? s.value.toFixed(1) : '—' }}</span>
+        </div>
+        <div
+          v-if="tooltipData.composite !== null"
+          class="flex items-center gap-2 text-[11px] leading-relaxed mt-1 pt-1 border-t border-vs-border/50"
+        >
+          <span class="w-2 h-[2px] rounded shrink-0" :style="{ backgroundColor: tooltipData.compositeColor }"></span>
+          <span class="text-vs-text flex-1 font-medium">Annual Score</span>
+          <span class="text-vs-text font-mono tabular-nums">{{ tooltipData.composite.toFixed(1) }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>

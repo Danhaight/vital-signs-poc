@@ -58,11 +58,19 @@ function clearFilters() {
   composableClearFilters()
   showCount.value = 25
 }
+
+// Left-border accent color based on org tier
+const LEGISLATIVE_ORG_TYPES_SET = new Set(['Legislative Body', 'Judicial Body'])
+function citationAccentColor(cit: PolicyCitation): string {
+  if (LEGISLATIVE_ORG_TYPES_SET.has(cit.orgType)) return '#E8C547'
+  if (cit.orgType === 'Government') return '#D4A85C'
+  return '#4d5162'
+}
 </script>
 
 <template>
   <div>
-    <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider font-mono mb-4">
+    <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider mb-4">
       Policy Citations
     </h3>
 
@@ -114,7 +122,7 @@ function clearFilters() {
         <div class="flex gap-1">
           <button
             @click="filterOrgTier = filterOrgTier === 'legislative' ? null : 'legislative'"
-            class="px-2 py-1 rounded text-xs font-mono transition-colors"
+            class="px-2 py-1 rounded text-xs transition-colors"
             :class="filterOrgTier === 'legislative'
               ? 'bg-[#E8C547]/20 text-[#E8C547] border border-[#E8C547]/30'
               : 'bg-vs-bg text-vs-dim border border-vs-border hover:text-vs-muted'"
@@ -123,7 +131,7 @@ function clearFilters() {
           </button>
           <button
             @click="filterOrgTier = filterOrgTier === 'gov' ? null : 'gov'"
-            class="px-2 py-1 rounded text-xs font-mono transition-colors"
+            class="px-2 py-1 rounded text-xs transition-colors"
             :class="filterOrgTier === 'gov'
               ? 'bg-[#D4A85C]/20 text-[#D4A85C] border border-[#D4A85C]/30'
               : 'bg-vs-bg text-vs-dim border border-vs-border hover:text-vs-muted'"
@@ -132,7 +140,7 @@ function clearFilters() {
           </button>
           <button
             @click="filterOrgTier = filterOrgTier === 'ngo' ? null : 'ngo'"
-            class="px-2 py-1 rounded text-xs font-mono transition-colors"
+            class="px-2 py-1 rounded text-xs transition-colors"
             :class="filterOrgTier === 'ngo'
               ? 'bg-[#9A7830]/20 text-[#9A7830] border border-[#9A7830]/30'
               : 'bg-vs-bg text-vs-dim border border-vs-border hover:text-vs-muted'"
@@ -145,7 +153,7 @@ function clearFilters() {
         <div class="flex gap-1">
           <button
             @click="filterCore = filterCore === true ? null : true"
-            class="px-2 py-1 rounded text-xs font-mono transition-colors"
+            class="px-2 py-1 rounded text-xs transition-colors"
             :class="filterCore === true
               ? 'bg-[#D4A85C]/20 text-[#D4A85C] border border-[#D4A85C]/30'
               : 'bg-vs-bg text-vs-dim border border-vs-border hover:text-vs-muted'"
@@ -154,7 +162,7 @@ function clearFilters() {
           </button>
           <button
             @click="filterCore = filterCore === false ? null : false"
-            class="px-2 py-1 rounded text-xs font-mono transition-colors"
+            class="px-2 py-1 rounded text-xs transition-colors"
             :class="filterCore === false
               ? 'bg-vs-muted/20 text-vs-muted border border-vs-muted/30'
               : 'bg-vs-bg text-vs-dim border border-vs-border hover:text-vs-muted'"
@@ -199,8 +207,10 @@ function clearFilters() {
             <div
               v-for="(cit, idx) in citations"
               :key="idx"
-              class="bg-vs-surface border border-vs-border/50 rounded px-4 py-3
+              class="border border-vs-border/50 rounded px-4 py-3 border-l-2
                      hover:border-vs-border transition-colors group"
+              :style="{ borderLeftColor: citationAccentColor(cit) }"
+              :class="cit.coreTopic ? 'bg-vs-surface' : 'bg-vs-surface/50'"
             >
               <div class="flex items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
@@ -258,7 +268,7 @@ function clearFilters() {
       >
         <button
           @click="showMore"
-          class="px-4 py-2 text-sm font-mono text-vs-muted border border-vs-border rounded
+          class="px-4 py-2 text-sm text-vs-muted border border-vs-border rounded
                  hover:text-vs-text hover:border-vs-muted/50 transition-colors"
         >
           Show more ({{ visible.length }} of {{ filtered.length.toLocaleString() }})

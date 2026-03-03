@@ -85,9 +85,11 @@ function backToOverview() {
           <button
             v-if="selectedCategory"
             @click="backToOverview"
-            class="flex items-center gap-1.5 text-vs-muted hover:text-vs-text text-sm transition-colors"
+            class="flex items-center gap-1.5 text-vs-muted hover:text-vs-text hover:bg-vs-surface text-sm px-2 py-1 -ml-2 rounded transition-all"
           >
-            <span class="text-lg leading-none">←</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="shrink-0">
+              <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
             <span>Back to Overview</span>
           </button>
           <div v-else class="flex gap-2">
@@ -114,22 +116,24 @@ function backToOverview() {
 
     <!-- Main content -->
     <main class="px-8 py-10">
-      <!-- L2: Tool Overview -->
-      <ToolView
-        v-if="!selectedCategory"
-        :key="'l2-' + activeClient"
-        :data="clientData"
-        @select-category="selectCategory"
-      />
+      <Transition name="fade" mode="out-in">
+        <!-- L2: Tool Overview -->
+        <ToolView
+          v-if="!selectedCategory"
+          :key="'l2-' + activeClient"
+          :data="clientData"
+          @select-category="selectCategory"
+        />
 
-      <!-- L3: Category Breakout -->
-      <CategoryBreakout
-        v-else
-        :key="'l3-' + activeClient + '-' + selectedCategory"
-        :data="clientData"
-        :category-key="selectedCategory!"
-        @back="backToOverview"
-      />
+        <!-- L3: Category Breakout -->
+        <CategoryBreakout
+          v-else
+          :key="'l3-' + activeClient + '-' + selectedCategory"
+          :data="clientData"
+          :category-key="selectedCategory!"
+          @back="backToOverview"
+        />
+      </Transition>
     </main>
   </div>
 </template>

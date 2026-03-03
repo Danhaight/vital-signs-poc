@@ -41,9 +41,14 @@ const emit = defineEmits<{
       />
     </div>
 
-    <!-- Source attribution -->
-    <p class="text-vs-dim text-xs mt-8 font-mono">
-      Source: Vital Signs Framework · Darkhorse · 2026
-    </p>
+    <!-- Footer -->
+    <div class="border-t border-vs-border mt-8 pt-4 flex items-center justify-between">
+      <span class="text-vs-dim text-xs font-mono">
+        Source: Vital Signs Framework · Darkhorse · 2026
+      </span>
+      <span class="text-vs-dim text-xs font-mono">
+        Launched {{ data.config.launchYear }} · Data through {{ data.config.yearRange[1] }}
+      </span>
+    </div>
   </div>
 </template>

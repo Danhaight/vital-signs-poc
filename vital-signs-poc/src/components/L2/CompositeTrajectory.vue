@@ -224,7 +224,11 @@ const xTicks = computed(() => {
   for (let y = start; y <= end; y += step) {
     ticks.push(y)
   }
-  if (ticks[ticks.length - 1] !== end) ticks.push(end)
+  // Only append end year if sufficiently far from the last tick to avoid cramped labels
+  const last = ticks[ticks.length - 1]!
+  if (last !== end && (end - last) > step / 2) {
+    ticks.push(end)
+  }
   return ticks
 })
 
@@ -295,6 +299,49 @@ watch(
   },
   { deep: true },
 )
+
+// ─── Tooltip ───
+const hoverYear = ref<number | null>(null)
+const tooltipX = ref(0)
+const tooltipY = ref(0)
+
+function onChartMouseMove(event: MouseEvent) {
+  if (!xScale.value || !svgRef.value) return
+  const rect = svgRef.value.getBoundingClientRect()
+  const mouseX = event.clientX - rect.left - dimensions.value.margin.left
+  const [start, end] = config.value.yearRange
+  const rawYear = xScale.value.invert(mouseX)
+  const nearestYear = Math.round(Math.max(start, Math.min(end, rawYear)))
+  hoverYear.value = nearestYear
+  tooltipX.value = event.clientX - rect.left
+  tooltipY.value = event.clientY - rect.top
+}
+
+function onChartMouseLeave() {
+  hoverYear.value = null
+}
+
+const tooltipData = computed(() => {
+  if (hoverYear.value === null) return null
+  const yr = hoverYear.value
+  const cumRow = cumulativeStackData.value.find(d => d.year === yr)
+  const cumComp = cumulativeComposite.value.find(d => d.year === yr)
+  const yearRow = years.value.find(y => y.year === yr)
+
+  // Per-category cumulative breakdowns (reversed for top-to-bottom display)
+  const categories = [...STACK_KEYS].reverse().map(key => ({
+    label: CATEGORY_MAP[key].label.split(' ')[0]!,
+    color: CATEGORY_MAP[key].color,
+    value: cumRow ? cumRow[key] : null,
+  }))
+
+  return {
+    year: yr,
+    categories,
+    cumulativeTotal: cumComp ? cumComp.total : null,
+    annualComposite: yearRow ? yearRow.composite : null,
+  }
+})
 </script>
 
 <template>
@@ -302,7 +349,7 @@ watch(
     <!-- Header with title + score callout -->
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider font-mono">
+        <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider">
           Cumulative Vital Signs Impact
         </h3>
         <!-- Inline legend -->
@@ -316,27 +363,32 @@ watch(
               class="w-2.5 h-2.5 rounded-sm inline-block"
               :style="{ backgroundColor: item.color, opacity: 0.7 }"
             />
-            <span class="text-[10px] font-mono text-vs-dim">
+            <span class="text-[10px] text-vs-dim">
               {{ item.label.split(' ')[0] }}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- Score callout — cumulative total + current point-in-time -->
+      <!-- Score callout — current composite as hero, cumulative secondary -->
       <div v-if="latestYear" class="text-right">
-        <div class="text-[28px] font-mono font-bold leading-none" style="color: #C8C3B8">
-          {{ Math.round(latestCumulative) }}
+        <div class="flex items-baseline justify-end gap-1">
+          <span class="text-[32px] font-mono font-bold leading-none" style="color: #C8C3B8">
+            {{ latestYear.composite.toFixed(1) }}
+          </span>
+          <span class="text-sm font-mono text-vs-dim">/100</span>
         </div>
-        <div class="text-[10px] font-mono text-vs-dim mt-1">
-          cumulative pts
-        </div>
-        <div class="text-xs font-mono text-vs-muted mt-1.5">
-          {{ latestYear.composite.toFixed(1) }}
-          <span class="text-vs-dim">current · </span>
-          <span :class="deltaFromBaseline >= 0 ? 'text-trend-up' : 'text-trend-down'">
+        <div class="flex items-center justify-end gap-2 mt-1">
+          <span class="text-[11px] font-mono text-vs-dim">current score</span>
+          <span
+            class="text-[11px] font-mono font-medium"
+            :class="deltaFromBaseline >= 0 ? 'text-trend-up' : 'text-trend-down'"
+          >
             {{ deltaFromBaseline >= 0 ? '↑' : '↓' }}{{ Math.abs(deltaFromBaseline).toFixed(1) }}
           </span>
+        </div>
+        <div class="text-[11px] font-mono text-vs-dim mt-1.5">
+          {{ Math.round(latestCumulative) }} cumulative pts
         </div>
       </div>
     </div>
@@ -440,8 +492,68 @@ watch(
               stroke-width="2"
             />
           </g>
+
+          <!-- Hover overlay -->
+          <rect
+            :width="dimensions.innerWidth"
+            :height="dimensions.innerHeight"
+            fill="transparent"
+            @mousemove="onChartMouseMove"
+            @mouseleave="onChartMouseLeave"
+            style="cursor: crosshair"
+          />
+          <!-- Vertical crosshair -->
+          <line
+            v-if="hoverYear !== null && xScale"
+            :x1="xScale(hoverYear)"
+            :y1="0"
+            :x2="xScale(hoverYear)"
+            :y2="dimensions.innerHeight"
+            stroke="#C8C3B8"
+            stroke-width="1"
+            stroke-dasharray="3,3"
+            opacity="0.3"
+            pointer-events="none"
+          />
         </g>
       </svg>
+
+      <!-- Tooltip -->
+      <div
+        v-if="tooltipData"
+        class="absolute pointer-events-none bg-vs-bg border border-vs-border rounded-lg px-3 py-2.5 shadow-xl z-10"
+        :style="{
+          left: (tooltipX > dimensions.width * 0.7 ? tooltipX - 12 : tooltipX + 12) + 'px',
+          top: Math.max(0, tooltipY - 20) + 'px',
+          transform: tooltipX > dimensions.width * 0.7 ? 'translateX(-100%)' : 'none',
+        }"
+      >
+        <div class="text-[11px] font-mono font-semibold text-vs-text mb-1.5">{{ tooltipData.year }}</div>
+        <!-- Per-category cumulative breakdown -->
+        <div v-for="c in tooltipData.categories" :key="c.label" class="flex items-center gap-2 text-[11px] leading-relaxed">
+          <span class="w-2 h-2 rounded-sm shrink-0" :style="{ backgroundColor: c.color, opacity: 0.7 }"></span>
+          <span class="text-vs-muted flex-1">{{ c.label }}</span>
+          <span class="text-vs-text font-mono tabular-nums">{{ c.value !== null ? c.value.toFixed(1) : '—' }}</span>
+        </div>
+        <!-- Cumulative total -->
+        <div
+          v-if="tooltipData.cumulativeTotal !== null"
+          class="flex items-center gap-2 text-[11px] leading-relaxed mt-1 pt-1 border-t border-vs-border/50"
+        >
+          <span class="w-2 h-[2px] rounded shrink-0" style="background-color: #C8C3B8"></span>
+          <span class="text-vs-text flex-1 font-medium">Cumulative</span>
+          <span class="text-vs-text font-mono tabular-nums">{{ tooltipData.cumulativeTotal.toFixed(1) }}</span>
+        </div>
+        <!-- Annual composite -->
+        <div
+          v-if="tooltipData.annualComposite !== null"
+          class="flex items-center gap-2 text-[11px] leading-relaxed mt-0.5"
+        >
+          <span class="w-2 h-[2px] rounded shrink-0 opacity-50" style="background-color: #C8C3B8"></span>
+          <span class="text-vs-dim flex-1">Annual</span>
+          <span class="text-vs-dim font-mono tabular-nums">{{ tooltipData.annualComposite.toFixed(1) }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>

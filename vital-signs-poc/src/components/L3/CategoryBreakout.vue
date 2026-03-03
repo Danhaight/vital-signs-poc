@@ -28,12 +28,6 @@ const latestValue = computed(() => {
   return last ? last[props.categoryKey] : 0
 })
 
-const trendIcon = computed(() => {
-  if (trend.value === 'strengthening') return '↑'
-  if (trend.value === 'weakening') return '↓'
-  return '→'
-})
-
 const trendColor = computed(() => {
   if (trend.value === 'strengthening') return '#8DB580'
   if (trend.value === 'weakening') return '#C47070'
@@ -82,10 +76,30 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           <span class="text-vs-dim text-sm font-mono">/100</span>
         </div>
         <span
-          class="text-sm font-mono font-medium"
+          class="text-sm font-mono font-medium flex items-center gap-1"
           :style="{ color: trendColor }"
         >
-          {{ trendIcon }} {{ trend }}
+          <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+            <path
+              v-if="trend === 'strengthening'"
+              d="M5 2L8 6H2L5 2Z"
+              fill="currentColor"
+            />
+            <path
+              v-else-if="trend === 'weakening'"
+              d="M5 8L2 4H8L5 8Z"
+              fill="currentColor"
+            />
+            <path
+              v-else
+              d="M2 5H7M7 5L5 3M7 5L5 7"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          {{ trend }}
         </span>
       </div>
     </div>
@@ -93,9 +107,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
     <!-- Chart + Narrative side-by-side -->
     <div class="bg-vs-surface border border-vs-border rounded-lg p-6 mb-6">
       <div class="flex gap-6">
-        <!-- Chart: takes ~62% -->
-        <div class="flex-[3] min-w-0">
-          <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider font-mono mb-3">
+        <!-- Chart: takes ~67% -->
+        <div class="flex-[4] min-w-0">
+          <h3 class="text-sm font-semibold text-vs-muted uppercase tracking-wider mb-3">
             Sub-Component Decomposition
           </h3>
           <SubComponentChart
