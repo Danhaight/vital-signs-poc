@@ -19,11 +19,10 @@ const emit = defineEmits<{
 const cat = computed<CategoryMeta>(() => CATEGORY_MAP[props.categoryKey])
 
 const containerRef = ref<HTMLElement | null>(null)
-// Reduced left margin — no y-axis labels. Small right pad for endpoint dot.
 const { dimensions } = useChartDimensions(
   containerRef,
-  { top: 4, right: 10, bottom: 4, left: 4 },
-  0.7,
+  { top: 4, right: 6, bottom: 4, left: 6 },
+  0.55,
 )
 
 const svgRef = ref<SVGSVGElement | null>(null)
@@ -38,57 +37,50 @@ const latestValue = computed(() => {
   return last ? accessor(last) : 0
 })
 
-// Scales
-const xScale = computed(() => {
+// Band scale for columns — maps each year to an evenly-spaced band
+const xBand = computed(() => {
   const d = dimensions.value
-  if (!d.innerWidth) return null
+  if (!d.innerWidth || !props.years.length) return null
   return d3
-    .scaleLinear()
-    .domain([props.config.yearRange[0], props.config.yearRange[1]])
+    .scaleBand<number>()
+    .domain(props.years.map(y => y.year))
     .range([0, d.innerWidth])
+    .padding(0.2)
 })
 
+// Linear y scale (0–100 score)
 const yScale = computed(() => {
   const d = dimensions.value
   if (!d.innerHeight) return null
   return d3.scaleLinear().domain([0, 100]).range([d.innerHeight, 0])
 })
 
-// Path
-const linePath = computed(() => {
-  if (!xScale.value || !yScale.value) return ''
-  const gen = d3
-    .line<ComputedYear>()
-    .x(d => xScale.value!(d.year))
-    .y(d => yScale.value!(accessor(d)))
-    .curve(d3.curveLinear)
-  return gen(props.years) ?? ''
+// Bar data: x, y, width, height, and whether this is the latest year
+const bars = computed(() => {
+  if (!xBand.value || !yScale.value) return []
+  const h = dimensions.value.innerHeight
+  return props.years.map((d, i) => {
+    const val = accessor(d)
+    const barY = yScale.value!(val)
+    return {
+      year: d.year,
+      x: xBand.value!.bandwidth() < 1 ? i : xBand.value!(d.year)!,
+      y: barY,
+      width: Math.max(xBand.value!.bandwidth(), 1),
+      height: h - barY,
+      value: val,
+      isLast: i === props.years.length - 1,
+      isBaseline: d.year >= props.config.baselineStart && d.year <= props.config.baselineEnd,
+      isPreLaunch: d.year < props.config.launchYear,
+    }
+  })
 })
 
-// Area path (for gradient fill under the line)
-const areaPath = computed(() => {
-  if (!xScale.value || !yScale.value) return ''
-  const gen = d3
-    .area<ComputedYear>()
-    .x(d => xScale.value!(d.year))
-    .y0(dimensions.value.innerHeight)
-    .y1(d => yScale.value!(accessor(d)))
-    .curve(d3.curveLinear)
-  return gen(props.years) ?? ''
-})
-
-// Launch marker
+// Launch marker — positioned at left edge of the launch-year bar
 const launchX = computed(() => {
-  if (!xScale.value) return 0
-  return xScale.value(props.config.launchYear)
-})
-
-// Baseline band
-const baselineBand = computed(() => {
-  if (!xScale.value) return null
-  const x1 = xScale.value(props.config.baselineStart)
-  const x2 = xScale.value(props.config.baselineEnd)
-  return { x: x1, width: x2 - x1 }
+  if (!xBand.value) return 0
+  const x = xBand.value(props.config.launchYear)
+  return x != null ? x - xBand.value.step() * xBand.value.paddingOuter() * 0.5 : 0
 })
 
 const trendColor = computed(() => {
@@ -97,7 +89,10 @@ const trendColor = computed(() => {
   return '#8b8e99'
 })
 
-// Subtle horizontal gridlines — no axis labels, just faint reference marks
+// The most recent bar (for highlight glow)
+const lastBar = computed(() => bars.value.length > 0 ? bars.value[bars.value.length - 1] : null)
+
+// Subtle horizontal gridline at the midpoint
 function renderGridlines() {
   if (!svgRef.value || !yScale.value) return
   const svg = d3.select(svgRef.value)
@@ -106,7 +101,6 @@ function renderGridlines() {
   chartArea.select('.gridlines').remove()
   const g = chartArea.append('g').attr('class', 'gridlines')
 
-  // Just a midpoint reference line at 50
   g.append('line')
     .attr('x1', 0)
     .attr('x2', dimensions.value.innerWidth)
@@ -192,7 +186,7 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
       </div>
     </div>
 
-    <!-- Chart (no y-axis labels — "remove to improve") -->
+    <!-- Column chart -->
     <div ref="containerRef" class="w-full relative">
       <svg
         v-if="dimensions.width > 0"
@@ -202,28 +196,22 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
         class="overflow-visible"
       >
         <defs>
-          <!-- Gradient fill for area under the line -->
-          <linearGradient :id="'panel-grad-' + categoryKey" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" :stop-color="cat.color" stop-opacity="0.15"/>
-            <stop offset="100%" :stop-color="cat.color" stop-opacity="0.02"/>
+          <!-- Vertical gradient for columns: vivid at top → fades toward baseline -->
+          <linearGradient :id="'bar-grad-' + categoryKey" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" :stop-color="cat.color" stop-opacity="0.85"/>
+            <stop offset="100%" :stop-color="cat.color" stop-opacity="0.35"/>
+          </linearGradient>
+          <!-- Dimmed gradient for pre-launch bars -->
+          <linearGradient :id="'bar-grad-dim-' + categoryKey" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" :stop-color="cat.color" stop-opacity="0.30"/>
+            <stop offset="100%" :stop-color="cat.color" stop-opacity="0.10"/>
           </linearGradient>
         </defs>
         <g
           class="chart-area"
           :transform="`translate(${dimensions.margin.left}, ${dimensions.margin.top})`"
         >
-          <!-- Baseline band -->
-          <rect
-            v-if="baselineBand"
-            :x="baselineBand.x"
-            :y="0"
-            :width="baselineBand.width"
-            :height="dimensions.innerHeight"
-            :fill="cat.color"
-            opacity="0.04"
-          />
-
-          <!-- Launch line -->
+          <!-- Launch divider line -->
           <line
             :x1="launchX"
             :y1="0"
@@ -235,40 +223,32 @@ watch(() => [dimensions.value, props.years], renderGridlines, { deep: true })
             opacity="0.2"
           />
 
-          <!-- Area fill -->
-          <path
-            :d="areaPath"
-            :fill="`url(#panel-grad-${categoryKey})`"
+          <!-- Column bars -->
+          <rect
+            v-for="bar in bars"
+            :key="bar.year"
+            :x="bar.x"
+            :y="bar.y"
+            :width="bar.width"
+            :height="Math.max(bar.height, 0)"
+            :rx="Math.min(bar.width * 0.2, 2.5)"
+            :ry="Math.min(bar.width * 0.2, 2.5)"
+            :fill="bar.isPreLaunch
+              ? `url(#bar-grad-dim-${categoryKey})`
+              : `url(#bar-grad-${categoryKey})`"
           />
 
-          <!-- Line -->
-          <path
-            :d="linePath"
-            fill="none"
-            :stroke="cat.color"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+          <!-- Highlight glow on the latest bar -->
+          <rect
+            v-if="lastBar"
+            :x="lastBar.x - 1"
+            :y="lastBar.y - 1"
+            :width="lastBar.width + 2"
+            :height="Math.max(lastBar.height + 1, 0)"
+            :rx="Math.min(lastBar.width * 0.2, 2.5)"
+            :fill="cat.color"
+            opacity="0.12"
           />
-
-          <!-- Endpoint dot with glow -->
-          <g v-if="xScale && yScale && years.length > 0">
-            <circle
-              :cx="xScale(years[years.length - 1]!.year)"
-              :cy="yScale(accessor(years[years.length - 1]!))"
-              r="6"
-              :fill="cat.color"
-              opacity="0.1"
-            />
-            <circle
-              :cx="xScale(years[years.length - 1]!.year)"
-              :cy="yScale(accessor(years[years.length - 1]!))"
-              r="3"
-              :fill="cat.color"
-              stroke="#12151e"
-              stroke-width="1.5"
-            />
-          </g>
         </g>
       </svg>
     </div>

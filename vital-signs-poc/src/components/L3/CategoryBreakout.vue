@@ -3,7 +3,6 @@ import { computed, onMounted, onUnmounted, provide } from 'vue'
 import type { ClientData, CategoryKey } from '../../data/types'
 import { CATEGORY_MAP } from '../../data/types'
 import SubComponentChart from './SubComponentChart.vue'
-import CategoryNarrative from './CategoryNarrative.vue'
 import PolicyCitations from './PolicyCitations.vue'
 import { usePolicyFilters, POLICY_FILTERS_KEY } from '../../composables/usePolicyFilters'
 
@@ -105,31 +104,15 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
       </div>
     </div>
 
-    <!-- Chart + Narrative side-by-side -->
+    <!-- Chart -->
     <div class="vs-glass-raised rounded-xl p-7 mb-8">
-      <div class="flex gap-8">
-        <!-- Chart: takes ~67% -->
-        <div class="flex-[4] min-w-0">
-          <h3 class="text-xs font-semibold text-vs-muted uppercase tracking-[0.12em] mb-4">
-            Sub-Component Decomposition
-          </h3>
-          <SubComponentChart
-            :data="data"
-            :category-key="categoryKey"
-          />
-        </div>
-
-        <!-- Narrative: takes ~33% -->
-        <div class="flex-[2] min-w-0 flex flex-col justify-between border-l border-vs-border/30 pl-7">
-          <CategoryNarrative
-            :data="data"
-            :category-key="categoryKey"
-          />
-          <p class="text-vs-dim text-[10px] font-mono mt-5 pt-4 border-t border-vs-border/20">
-            Sources: {{ cat.sources.join(', ') }} · {{ data.config.yearRange[0] }}–{{ data.config.yearRange[1] }}
-          </p>
-        </div>
-      </div>
+      <h3 class="text-xs font-semibold text-vs-muted uppercase tracking-[0.12em] mb-4">
+        Sub-Component Decomposition
+      </h3>
+      <SubComponentChart
+        :data="data"
+        :category-key="categoryKey"
+      />
     </div>
 
     <!-- Policy citations (only for policy category) -->

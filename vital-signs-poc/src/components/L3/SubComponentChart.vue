@@ -34,8 +34,8 @@ interface SeriesDef {
   weight?: string
   color: string
   values: { year: number; value: number }[]
-  dashed?: boolean // for carried-forward opinion
-  isArea?: boolean // true for cumulative/stock series at L3
+  dashed?: boolean
+  isArea?: boolean
 }
 
 const series = computed<SeriesDef[]>(() => {
@@ -129,7 +129,6 @@ const series = computed<SeriesDef[]>(() => {
     }
 
     case 'opinion': {
-      // Show the composite z-score rescaled, with carried-forward marking
       return [
         {
           key: 'opinion',
@@ -144,18 +143,13 @@ const series = computed<SeriesDef[]>(() => {
       const ps = props.data.policySummary
       const pf = policyFilters
 
-      // Check if chart-relevant filters are active (orgTier or core)
-      const chartFilterActive = pf
-        ? pf.hasChartFilter.value
-        : false
+      const chartFilterActive = pf ? pf.hasChartFilter.value : false
 
       if (chartFilterActive && pf && !pf.loading.value && pf.allCitations.value.length > 0) {
-        // Filtered mode: single line from raw citation aggregation
         const maxVal = pf.maxTotal.value
         const byYear = pf.filteredByYear.value
         const yearMap = new Map(byYear.map(d => [d.year, d.count]))
 
-        // Build descriptive label from active filters
         const parts: string[] = []
         if (pf.filterOrgTier.value === 'legislative') parts.push('Legislative')
         else if (pf.filterOrgTier.value === 'gov') parts.push('Government')
@@ -177,7 +171,6 @@ const series = computed<SeriesDef[]>(() => {
         ]
       }
 
-      // Default: unfiltered gov vs ngo split from pre-aggregated data
       const maxTotal = Math.max(...ps.map(p => p.total), 1)
       return [
         {
@@ -200,61 +193,107 @@ const series = computed<SeriesDef[]>(() => {
   }
 })
 
-// Category composite line (weighted flow score from L2)
-const compositeSeries = computed<SeriesDef>(() => ({
-  key: 'composite',
-  label: 'Annual Score',
-  color: cat.value.color,
-  values: props.data.years.map(y => ({
-    year: y.year,
-    value: y[props.categoryKey],
-  })),
-}))
 
-// Scales
-const xScale = computed(() => {
+// ─── Scales ───
+
+// Collect all years present in any series
+const allYears = computed(() => {
+  const yearSet = new Set<number>()
+  for (const s of series.value) {
+    for (const v of s.values) yearSet.add(v.year)
+  }
+  return [...yearSet].sort((a, b) => a - b)
+})
+
+// Band scale for stacked columns
+const xBand = computed(() => {
   const d = dimensions.value
-  if (!d.innerWidth) return null
+  if (!d.innerWidth || !allYears.value.length) return null
   return d3
-    .scaleLinear()
-    .domain([config.value.yearRange[0], config.value.yearRange[1]])
+    .scaleBand<number>()
+    .domain(allYears.value)
     .range([0, d.innerWidth])
+    .padding(0.2)
+})
+
+// Y scale — for stacked bars the max is the sum of all series at each year
+const stackMax = computed(() => {
+  const yrs = allYears.value
+  let max = 0
+  for (const yr of yrs) {
+    let sum = 0
+    for (const s of series.value) {
+      const point = s.values.find(v => v.year === yr)
+      sum += point?.value ?? 0
+    }
+    if (sum > max) max = sum
+  }
+  return Math.max(max, 1)
 })
 
 const yScale = computed(() => {
   const d = dimensions.value
   if (!d.innerHeight) return null
-  return d3.scaleLinear().domain([0, 100]).range([d.innerHeight, 0])
+  // Use the stacked max (or 100 if it's smaller, to keep a sensible ceiling)
+  const domainMax = Math.max(stackMax.value, 10)
+  return d3.scaleLinear().domain([0, domainMax]).range([d.innerHeight, 0])
 })
 
-// Line generator factory (curveLinear to prevent overshoot below 0)
-function makeLine(vals: { year: number; value: number }[]) {
-  if (!xScale.value || !yScale.value) return ''
-  const gen = d3
-    .line<{ year: number; value: number }>()
-    .x(d => xScale.value!(d.year))
-    .y(d => yScale.value!(d.value))
-    .curve(d3.curveLinear)
-  return gen(vals) ?? ''
+// ─── Stacked bar data ───
+
+interface StackedBar {
+  year: number
+  seriesKey: string
+  color: string
+  y0: number // bottom of segment (value)
+  y1: number // top of segment (value)
+  x: number  // pixel x
+  barWidth: number
+  yPx: number  // pixel y (top)
+  heightPx: number // pixel height
+  isPreLaunch: boolean
 }
 
+const stackedBars = computed<StackedBar[]>(() => {
+  if (!xBand.value || !yScale.value) return []
+  const bars: StackedBar[] = []
+  const bw = xBand.value.bandwidth()
 
-// Area generator factory (for cumulative/stock series — uses linear to avoid overshoot below 0)
-function makeArea(vals: { year: number; value: number }[]) {
-  if (!xScale.value || !yScale.value) return ''
-  const gen = d3
-    .area<{ year: number; value: number }>()
-    .x(d => xScale.value!(d.year))
-    .y0(dimensions.value.innerHeight)
-    .y1(d => yScale.value!(d.value))
-    .curve(d3.curveLinear)
-  return gen(vals) ?? ''
-}
+  for (const yr of allYears.value) {
+    let cumulative = 0
+    for (const s of series.value) {
+      const point = s.values.find(v => v.year === yr)
+      const val = point?.value ?? 0
+      const y0 = cumulative
+      const y1 = cumulative + val
+      cumulative = y1
 
-// For opinion: generate segments (solid for observed, dashed for carried)
+      const yPxTop = yScale.value!(y1)
+      const yPxBottom = yScale.value!(y0)
+
+      bars.push({
+        year: yr,
+        seriesKey: s.key,
+        color: s.color,
+        y0,
+        y1,
+        x: xBand.value!(yr)!,
+        barWidth: bw,
+        yPx: yPxTop,
+        heightPx: Math.max(yPxBottom - yPxTop, 0),
+        isPreLaunch: yr < config.value.launchYear,
+      })
+    }
+  }
+  return bars
+})
+
+// ─── Opinion: keep as line (single series, special treatment) ───
+
 const opinionSegments = computed(() => {
-  if (props.categoryKey !== 'opinion' || !xScale.value || !yScale.value) return []
+  if (props.categoryKey !== 'opinion' || !xBand.value || !yScale.value) return []
   const years = props.data.years
+  const bw = xBand.value.bandwidth()
   const segments: { path: string; dashed: boolean }[] = []
 
   let currentSegment: typeof years = []
@@ -265,16 +304,17 @@ const opinionSegments = computed(() => {
     const yrDashed = yr.opinionCarriedForward
 
     if (yrDashed !== isDashed && currentSegment.length > 0) {
-      // End current segment, start new one with overlap at boundary
       const gen = d3
         .line<typeof years[0]>()
-        .x(d => xScale.value!(d.year))
+        .x(d => {
+          const bx = xBand.value!(d.year)
+          return (bx != null ? bx : 0) + bw / 2
+        })
         .y(d => yScale.value!(d.opinion))
         .curve(d3.curveMonotoneX)
       const path = gen(currentSegment) ?? ''
       if (path) segments.push({ path, dashed: isDashed })
 
-      // Start new segment including the boundary point
       currentSegment = [years[i - 1]!, yr]
       isDashed = yrDashed
     } else {
@@ -282,11 +322,13 @@ const opinionSegments = computed(() => {
     }
   }
 
-  // Flush final segment
   if (currentSegment.length > 0) {
     const gen = d3
       .line<typeof years[0]>()
-      .x(d => xScale.value!(d.year))
+      .x(d => {
+        const bx = xBand.value!(d.year)
+        return (bx != null ? bx : 0) + bw / 2
+      })
       .y(d => yScale.value!(d.opinion))
       .curve(d3.curveMonotoneX)
     const path = gen(currentSegment) ?? ''
@@ -296,21 +338,34 @@ const opinionSegments = computed(() => {
   return segments
 })
 
-// Launch marker
+// ─── Launch marker ───
 const launchX = computed(() => {
-  if (!xScale.value) return 0
-  return xScale.value(config.value.launchYear)
+  if (!xBand.value) return 0
+  const bx = xBand.value(config.value.launchYear)
+  return bx != null ? bx : 0
 })
 
 // Baseline band
 const baselineBand = computed(() => {
-  if (!xScale.value) return null
-  const x1 = xScale.value(config.value.baselineStart)
-  const x2 = xScale.value(config.value.baselineEnd)
-  return { x: x1, width: x2 - x1 }
+  if (!xBand.value) return null
+  const step = xBand.value.step()
+  const pad = xBand.value.paddingOuter() * step
+  const x1 = xBand.value(config.value.baselineStart)
+  const x2end = xBand.value(config.value.baselineEnd)
+  if (x1 == null || x2end == null) return null
+  return { x: x1 - pad * 0.5, width: x2end - x1 + xBand.value.bandwidth() + pad * 0.5 }
 })
 
-const yTicks = [0, 25, 50, 75, 100]
+// ─── Y ticks (dynamic based on stacked max) ───
+const yTicks = computed(() => {
+  const max = stackMax.value
+  if (max <= 100) return [0, 25, 50, 75, 100]
+  // For stacked values that exceed 100, generate nice ticks
+  const step = max <= 200 ? 50 : max <= 500 ? 100 : 200
+  const ticks: number[] = []
+  for (let v = 0; v <= max; v += step) ticks.push(v)
+  return ticks
+})
 
 const xTicks = computed(() => {
   const [start, end] = config.value.yearRange
@@ -318,7 +373,6 @@ const xTicks = computed(() => {
   const step = span > 12 ? 4 : span > 8 ? 2 : 1
   const ticks: number[] = []
   for (let y = start; y <= end; y += step) ticks.push(y)
-  // Only append end year if sufficiently far from the last tick to avoid cramped labels
   const last = ticks[ticks.length - 1]!
   if (last !== end && (end - last) > step / 2) {
     ticks.push(end)
@@ -327,17 +381,23 @@ const xTicks = computed(() => {
 })
 
 function renderAxes() {
-  if (!svgRef.value || !xScale.value || !yScale.value) return
+  if (!svgRef.value || !xBand.value || !yScale.value) return
   const svg = d3.select(svgRef.value)
   const chartArea = svg.select('.chart-area')
 
+  // X axis — use band center positions
   chartArea.select('.x-axis').remove()
+  const xAxisScale = d3
+    .scaleLinear()
+    .domain([config.value.yearRange[0], config.value.yearRange[1]])
+    .range([0, dimensions.value.innerWidth])
+
   chartArea
     .append('g')
     .attr('class', 'x-axis')
     .attr('transform', `translate(0, ${dimensions.value.innerHeight})`)
     .call(
-      d3.axisBottom(xScale.value)
+      d3.axisBottom(xAxisScale)
         .tickValues(xTicks.value)
         .tickFormat(d => String(d))
         .tickSize(0)
@@ -349,13 +409,14 @@ function renderAxes() {
     .style('font-family', "'DM Mono', monospace")
     .style('font-size', '11px')
 
+  // Y axis
   chartArea.select('.y-axis').remove()
   chartArea
     .append('g')
     .attr('class', 'y-axis')
     .call(
       d3.axisLeft(yScale.value)
-        .tickValues(yTicks)
+        .tickValues(yTicks.value)
         .tickSize(-dimensions.value.innerWidth)
         .tickPadding(8),
     )
@@ -380,13 +441,24 @@ const tooltipX = ref(0)
 const tooltipY = ref(0)
 
 function onChartMouseMove(event: MouseEvent) {
-  if (!xScale.value || !svgRef.value) return
+  if (!xBand.value || !svgRef.value) return
   const rect = svgRef.value.getBoundingClientRect()
   const mouseX = event.clientX - rect.left - dimensions.value.margin.left
-  const [start, end] = config.value.yearRange
-  const rawYear = xScale.value.invert(mouseX)
-  const nearestYear = Math.round(Math.max(start, Math.min(end, rawYear)))
-  hoverYear.value = nearestYear
+
+  // Find nearest band
+  const years = allYears.value
+  let nearest = years[0]!
+  let minDist = Infinity
+  for (const yr of years) {
+    const bx = xBand.value(yr)!
+    const center = bx + xBand.value.bandwidth() / 2
+    const dist = Math.abs(mouseX - center)
+    if (dist < minDist) {
+      minDist = dist
+      nearest = yr
+    }
+  }
+  hoverYear.value = nearest
   tooltipX.value = event.clientX - rect.left
   tooltipY.value = event.clientY - rect.top
 }
@@ -402,41 +474,27 @@ const tooltipData = computed(() => {
     const point = s.values.find(v => v.year === yr)
     return { label: s.label, color: s.color, value: point?.value ?? null }
   })
-  const compositePoint = compositeSeries.value.values.find(v => v.year === yr)
   return {
     year: yr,
     series: seriesValues,
-    composite: props.categoryKey !== 'opinion' ? (compositePoint?.value ?? null) : null,
-    compositeColor: cat.value.color,
   }
 })
 </script>
 
 <template>
   <div class="w-full">
-    <!-- Direct labels (legend replacement) -->
+    <!-- Legend -->
     <div class="flex items-center gap-4 mb-4 flex-wrap">
       <div
         v-for="s in series"
         :key="s.key"
         class="flex items-center gap-1.5"
       >
-        <!-- Area swatch for cumulative/stock series, line swatch for flow -->
         <span
-          v-if="s.isArea"
-          class="w-4 h-2.5 rounded-[3px]"
-          :style="{ backgroundColor: s.color, opacity: 0.25 }"
-        ></span>
-        <span
-          v-else
-          class="w-4 h-0.5 rounded"
-          :style="{ backgroundColor: s.color }"
+          class="w-3.5 h-2.5 rounded-[2px]"
+          :style="{ backgroundColor: s.color, opacity: 0.75 }"
         ></span>
         <span class="text-[11px] text-vs-muted">{{ s.label }}</span>
-      </div>
-      <div class="flex items-center gap-1.5 border-l border-vs-border/40 pl-4">
-        <span class="w-4 h-[2px] rounded" :style="{ backgroundColor: cat.color }"></span>
-        <span class="text-[11px] font-mono text-vs-text font-medium">Annual Score</span>
       </div>
       <!-- Opinion dashed key -->
       <div
@@ -498,32 +556,23 @@ const tooltipData = computed(() => {
 
           <!-- Chart content -->
           <g>
-            <!-- Sub-component series -->
+            <!-- Stacked column bars (for all categories except opinion) -->
             <template v-if="categoryKey !== 'opinion'">
-              <!-- Area fills for cumulative/stock series (rendered first, behind lines) -->
-              <template v-for="s in series" :key="s.key + '-area'">
-                <path
-                  v-if="s.isArea"
-                  :d="makeArea(s.values)"
-                  :fill="s.color"
-                  opacity="0.08"
-                  stroke="none"
-                />
-              </template>
-              <!-- Lines for all series (area series get stroke on top of fill) -->
-              <path
-                v-for="s in series"
-                :key="s.key"
-                :d="makeLine(s.values)"
-                fill="none"
-                :stroke="s.color"
-                :stroke-width="s.isArea ? 2 : 1.5"
-                stroke-linecap="round"
-                :opacity="s.isArea ? 0.9 : 0.8"
+              <rect
+                v-for="bar in stackedBars"
+                :key="bar.year + '-' + bar.seriesKey"
+                :x="bar.x"
+                :y="bar.yPx"
+                :width="bar.barWidth"
+                :height="bar.heightPx"
+                :rx="Math.min(bar.barWidth * 0.12, 2)"
+                :ry="Math.min(bar.barWidth * 0.12, 2)"
+                :fill="bar.color"
+                :opacity="bar.isPreLaunch ? 0.35 : 0.8"
               />
             </template>
 
-            <!-- Opinion: segmented line with dashed for carried-forward -->
+            <!-- Opinion: keep as segmented line -->
             <template v-if="categoryKey === 'opinion'">
               <path
                 v-for="(seg, idx) in opinionSegments"
@@ -537,67 +586,22 @@ const tooltipData = computed(() => {
                 :opacity="seg.dashed ? 0.5 : 0.8"
               />
               <!-- Data quality dots -->
-              <circle
-                v-for="yr in data.years"
-                :key="yr.year"
-                :cx="xScale?.(yr.year) ?? 0"
-                :cy="yScale?.(yr.opinion) ?? 0"
-                :r="yr.opinionCarriedForward ? 2 : 3"
-                :fill="yr.opinionCarriedForward ? 'none' : '#B8A0CC'"
-                :stroke="yr.opinionCarriedForward ? '#B8A0CC' : '#151821'"
-                :stroke-width="yr.opinionCarriedForward ? 1 : 1.5"
-                :opacity="yr.opinionCarriedForward ? 0.5 : 1"
-              />
+              <template v-if="xBand && yScale">
+                <circle
+                  v-for="yr in data.years"
+                  :key="yr.year"
+                  :cx="(xBand(yr.year) ?? 0) + xBand.bandwidth() / 2"
+                  :cy="yScale(yr.opinion)"
+                  :r="yr.opinionCarriedForward ? 2 : 3"
+                  :fill="yr.opinionCarriedForward ? 'none' : '#B8A0CC'"
+                  :stroke="yr.opinionCarriedForward ? '#B8A0CC' : '#151821'"
+                  :stroke-width="yr.opinionCarriedForward ? 1 : 1.5"
+                  :opacity="yr.opinionCarriedForward ? 0.5 : 1"
+                />
+              </template>
             </template>
 
-            <!-- Weighted composite line (thicker, category color, linear for flow data) -->
-            <template v-if="categoryKey !== 'opinion'">
-              <path
-                :d="makeLine(compositeSeries.values)"
-                fill="none"
-                :stroke="cat.color"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </template>
           </g>
-
-          <!-- Endpoint annotations for each series -->
-          <template v-for="s in series" :key="s.key + '-label'">
-            <text
-              v-if="s.values.length > 0 && xScale && yScale"
-              :x="xScale(s.values[s.values.length - 1]!.year) + 8"
-              :y="yScale(s.values[s.values.length - 1]!.value) + 4"
-              :fill="s.color"
-              font-size="10"
-              font-family="'DM Mono', monospace"
-            >
-              {{ s.values[s.values.length - 1]!.value.toFixed(1) }}
-            </text>
-          </template>
-
-          <!-- Composite endpoint -->
-          <template v-if="categoryKey !== 'opinion' && compositeSeries.values.length > 0 && xScale && yScale">
-            <circle
-              :cx="xScale(compositeSeries.values[compositeSeries.values.length - 1]!.year)"
-              :cy="yScale(compositeSeries.values[compositeSeries.values.length - 1]!.value)"
-              r="4"
-              :fill="cat.color"
-              stroke="#151821"
-              stroke-width="2"
-            />
-            <text
-              :x="xScale(compositeSeries.values[compositeSeries.values.length - 1]!.year) + 8"
-              :y="yScale(compositeSeries.values[compositeSeries.values.length - 1]!.value) + 4"
-              :fill="cat.color"
-              font-size="12"
-              font-family="'DM Mono', monospace"
-              font-weight="600"
-            >
-              {{ compositeSeries.values[compositeSeries.values.length - 1]!.value.toFixed(1) }}
-            </text>
-          </template>
 
           <!-- Hover overlay -->
           <rect
@@ -608,18 +612,17 @@ const tooltipData = computed(() => {
             @mouseleave="onChartMouseLeave"
             style="cursor: crosshair"
           />
-          <!-- Vertical crosshair -->
-          <line
-            v-if="hoverYear !== null && xScale"
-            :x1="xScale(hoverYear)"
-            :y1="0"
-            :x2="xScale(hoverYear)"
-            :y2="dimensions.innerHeight"
-            stroke="#C8C3B8"
-            stroke-width="1"
-            stroke-dasharray="3,3"
-            opacity="0.3"
+          <!-- Hover highlight on the active column -->
+          <rect
+            v-if="hoverYear !== null && xBand"
+            :x="(xBand(hoverYear) ?? 0) - 2"
+            :y="0"
+            :width="xBand.bandwidth() + 4"
+            :height="dimensions.innerHeight"
+            fill="#C8C3B8"
+            opacity="0.04"
             pointer-events="none"
+            rx="2"
           />
         </g>
       </svg>
@@ -639,14 +642,6 @@ const tooltipData = computed(() => {
           <span class="w-2 h-2 rounded-[3px] shrink-0" :style="{ backgroundColor: s.color, opacity: 0.65 }"></span>
           <span class="text-vs-muted flex-1">{{ s.label }}</span>
           <span class="text-vs-text font-mono tabular-nums">{{ s.value !== null ? s.value.toFixed(1) : '—' }}</span>
-        </div>
-        <div
-          v-if="tooltipData.composite !== null"
-          class="flex items-center gap-2.5 text-[11px] leading-relaxed mt-1.5 pt-1.5 border-t border-vs-border/40"
-        >
-          <span class="w-2 h-[2px] rounded shrink-0" :style="{ backgroundColor: tooltipData.compositeColor }"></span>
-          <span class="text-vs-text flex-1 font-medium">Annual Score</span>
-          <span class="text-vs-text font-mono font-semibold tabular-nums">{{ tooltipData.composite.toFixed(1) }}</span>
         </div>
       </div>
     </div>

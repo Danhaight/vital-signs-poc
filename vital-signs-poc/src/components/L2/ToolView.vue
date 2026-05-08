@@ -2,7 +2,6 @@
 import type { ClientData, CategoryKey } from '../../data/types'
 import CompositeTrajectory from './CompositeTrajectory.vue'
 import CategorySmallMultiples from './CategorySmallMultiples.vue'
-import NarrativeBlock from './NarrativeBlock.vue'
 
 const props = defineProps<{
   data: ClientData
@@ -23,14 +22,9 @@ const emit = defineEmits<{
       </p>
     </div>
 
-    <!-- Hero card: chart + narrative as a single visual unit -->
+    <!-- Hero card: composite chart -->
     <div class="vs-glass-raised rounded-xl p-7 mb-8">
       <CompositeTrajectory :data="data" />
-
-      <!-- Narrative inside the hero card, separated by thin border -->
-      <div class="border-t border-vs-border/30 mt-6 pt-6">
-        <NarrativeBlock :data="data" />
-      </div>
     </div>
 
     <!-- Section label for small multiples -->
