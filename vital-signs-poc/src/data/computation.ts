@@ -22,6 +22,7 @@ import type {
 import { OI_RAW, OI_CONFIG } from './oi'
 import { KU_RAW, KU_CONFIG } from './ku'
 import { POLICY_SUMMARY } from './policy-summary'
+import { getDiscourseData } from './discourse'
 
 // === Category weights (Policy Impact archetype) ===
 const WEIGHTS: Record<CategoryKey, number> = {
@@ -366,6 +367,7 @@ export function computeClientData(clientId: ClientId): ClientData {
     years,
     trends,
     policySummary,
+    discourse: getDiscourseData(clientId),
     ...(clientId === 'oi' ? { rawOI: OI_RAW } : { rawKU: KU_RAW }),
   }
 }

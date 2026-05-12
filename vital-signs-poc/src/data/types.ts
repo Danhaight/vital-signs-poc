@@ -94,6 +94,8 @@ export interface ClientData {
   rawKU?: KURawYear[]
   // Policy citation counts by year (from Sage)
   policySummary: { year: number; core: number; other: number; total: number; coreOrgs: number; gov: number; ngo: number }[]
+  // Discourse: broader topic-area activity (background context for L3)
+  discourse: Record<CategoryKey, { year: number; value: number }[]>
 }
 
 /** Policy citation record for L3 detail view */

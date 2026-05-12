@@ -288,6 +288,53 @@ const stackedBars = computed<StackedBar[]>(() => {
   return bars
 })
 
+// ─── Discourse background area ───
+// Broader topic-area activity rendered as a smooth background curve
+
+const discourseValues = computed(() => {
+  return props.data.discourse[props.categoryKey] ?? []
+})
+
+// Discourse has its own y-scale (separate from the stacked bars)
+// We normalize it to fill roughly the top 70–90% of the chart height
+const discourseYScale = computed(() => {
+  const d = dimensions.value
+  if (!d.innerHeight || !discourseValues.value.length) return null
+  const max = Math.max(...discourseValues.value.map(v => v.value), 1)
+  // Scale so peak reaches ~85% of chart height (leaves breathing room at top)
+  return d3.scaleLinear().domain([0, max * 1.18]).range([d.innerHeight, 0])
+})
+
+const discourseAreaPath = computed(() => {
+  if (!xBand.value || !discourseYScale.value || !discourseValues.value.length) return ''
+  const bw = xBand.value.bandwidth()
+  const gen = d3
+    .area<{ year: number; value: number }>()
+    .x(d => {
+      const bx = xBand.value!(d.year)
+      return (bx != null ? bx : 0) + bw / 2
+    })
+    .y0(dimensions.value.innerHeight)
+    .y1(d => discourseYScale.value!(d.value))
+    .curve(d3.curveBasis) // smooth, organic shape
+  return gen(discourseValues.value) ?? ''
+})
+
+// Just the top edge of the discourse area (for a subtle stroke)
+const discourseLinePath = computed(() => {
+  if (!xBand.value || !discourseYScale.value || !discourseValues.value.length) return ''
+  const bw = xBand.value.bandwidth()
+  const gen = d3
+    .line<{ year: number; value: number }>()
+    .x(d => {
+      const bx = xBand.value!(d.year)
+      return (bx != null ? bx : 0) + bw / 2
+    })
+    .y(d => discourseYScale.value!(d.value))
+    .curve(d3.curveBasis)
+  return gen(discourseValues.value) ?? ''
+})
+
 // ─── Opinion: keep as line (single series, special treatment) ───
 
 const opinionSegments = computed(() => {
@@ -496,6 +543,14 @@ const tooltipData = computed(() => {
         ></span>
         <span class="text-[11px] text-vs-muted">{{ s.label }}</span>
       </div>
+      <!-- Discourse legend -->
+      <div
+        v-if="discourseValues.length > 0"
+        class="flex items-center gap-1.5 border-l border-vs-border/40 pl-4"
+      >
+        <span class="w-3.5 h-2.5 rounded-[2px] bg-white/[0.07]"></span>
+        <span class="text-[11px] text-vs-dim">Topic Discourse</span>
+      </div>
       <!-- Opinion dashed key -->
       <div
         v-if="categoryKey === 'opinion'"
@@ -517,6 +572,23 @@ const tooltipData = computed(() => {
           class="chart-area"
           :transform="`translate(${dimensions.margin.left}, ${dimensions.margin.top})`"
         >
+          <!-- Discourse background area (broader topic-area activity) -->
+          <path
+            v-if="discourseAreaPath"
+            :d="discourseAreaPath"
+            fill="#ffffff"
+            opacity="0.04"
+          />
+          <!-- Discourse top edge line (subtle) -->
+          <path
+            v-if="discourseLinePath"
+            :d="discourseLinePath"
+            fill="none"
+            stroke="#ffffff"
+            stroke-width="1"
+            opacity="0.07"
+          />
+
           <!-- Baseline band -->
           <rect
             v-if="baselineBand"
